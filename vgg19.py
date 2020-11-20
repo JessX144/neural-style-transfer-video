@@ -5,9 +5,21 @@ import tensorflow as tf
 
 import numpy as np
 
-
 # CUSTOMISED VGG MODEL 
 class vgg19():
+
+    # retrieves filter from dataset, applies bias 
+  def conv_layer(self, input, layer_name):
+
+    # (3, 3, 64, 64) filter
+    fil = tf.constant(self.data_dict[layer_name][0])
+    # input is previous tensor 
+    layer = tf.nn.conv2d(input, fil, strides=[1, 1, 1, 1], padding='SAME')
+    # (64,) bias 
+    layer = tf.nn.bias_add(layer, tf.constant(self.data_dict[layer_name][1]))
+    # apply relu to standardise 
+    return tf.nn.relu(layer)
+
   # model weights: path to load npy 
   def __init__(self, input_img):
 
@@ -39,7 +51,7 @@ class vgg19():
     self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
     self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
     self.conv3_4 = self.conv_layer(self.conv3_3, "conv3_4")
-    self.pool3 = tf.nn.max_pool(self.conv2_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool3')
+    self.pool3 = tf.nn.max_pool(self.conv3_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool3')
 
     self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
     self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
@@ -52,14 +64,3 @@ class vgg19():
     self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
     self.conv5_4 = self.conv_layer(self.conv5_3, "conv5_4")
     self.pool5 = tf.nn.max_pool(self.conv5_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool5')
-
-# retrieves filter from dataset, applies bias 
-def conv_layer(self, layer_name, input):
-  # (3, 3, 64, 64) filter
-  filter = tf.constant(self.data_dict[layer_name][0])
-  # input is previous tensor 
-  layer = tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
-  # (64,) bias 
-  layer = tf.nn.bias_add(layer, tf.constant(self.data_dict[layer_name][1]))
-  # apply relu to standardise 
-  return tf.nn.relu(layer)
