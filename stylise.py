@@ -22,22 +22,25 @@ def write_img(img_name, img):
 def process_img(img):
 	return img
 
-#def stylise(img, style):
-#	input_img = get_img(img, input_dir)
-#	style_img = get_img(style, style_dir)
+def stylise(img, style):
+  with tf.device('/gpu:0'):
 
-#	write_img(img, input_img)
-#	write_img(style, style_img)
+    style_img = get_img(style, style_dir)
+    input_image = get_img(img, input_dir)
 
-#	return img
+    img = np.zeros((1, 224, 224, 3), dtype=np.float32)
+
+    # first element in batch 
+    img[0] = np.asarray(Image.fromarray(input_image).convert('RGB').resize((224, 224)), np.float32)
+    vgg19.vgg19(img)  
+
+    write_img(img, input_img)
+    write_img(style, style_img)
+
+    return img
 
 def main():
-  img = np.zeros((1, 224, 224, 3), dtype=np.float32)
-  input_image = get_img('cloud', input_dir)
-
-  # first element in batch 
-  img[0] = np.asarray(Image.fromarray(input_image).convert('RGB').resize((224, 224)), np.float32)
-  vgg19.vgg19(img)  
+  stylise("cloud","lions")
 
 if __name__ == "__main__":
     main()
