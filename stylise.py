@@ -4,6 +4,7 @@ import cv2
 from PIL import Image
 
 import vgg19 
+from transformer import transformer
 
 # To avoid having to train the model, we take pretrained weights 
 model_weights = 'vgg19.npy'
@@ -34,9 +35,9 @@ def stylise(img, style):
     img[0] = np.asarray(Image.fromarray(input_image).convert('RGB').resize((224, 224)), np.float32)
     vgg19.vgg19(img)  
 
-    write_img(img, input_img)
-    write_img(style, style_img)
-
+    #write_img(img, input_img)
+    #write_img(style, style_img)
+    transformer(img)
     return img
 
 def main():
