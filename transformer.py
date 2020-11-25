@@ -51,9 +51,11 @@ def init_conv(net, out_ch, filter_size, name, transpose=False):
 
 def init_vars(net, out_ch, filter_size, name, transpose=False):
 
-  batch, rows, cols, ch = [i for i in net.get_shape()]
   #print("shape:")
   #print(net.get_shape())
+
+  batch, rows, cols, ch = [i for i in net.get_shape()]
+
   if not transpose:
       init_shape = [filter_size, filter_size, ch, out_ch]
   else:

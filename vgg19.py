@@ -38,7 +38,7 @@ class vgg19():
                     r_channel - VGG_MEAN[2],], axis=3)
 
     # no FC layers
-    self.conv1_1 = self.conv_layer(bgr, "conv1_1")
+    self.conv1_1 = self.conv_layer(input_img, "conv1_1")
     self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
     # tf.nn.avg_pool
     self.pool1 = tf.nn.max_pool(self.conv1_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool1')

@@ -1,24 +1,58 @@
 ﻿# TRAINS TRANSFORMER NET 
 import tensorflow as tf
+import os
+from transformer import transformer
+from vgg19 import vgg19
+import cv2
+import numpy as np
 
-style_layers = ['block1_conv1',
-                'block2_conv1',
-                'block3_conv1', 
-                'block4_conv1', 
-                'block5_conv1']
+style_layers = ['conv1_1',
+                'conv2_1',
+                'conv3_1', 
+                'conv4_1', 
+                'conv5_1']
 
-style_weights = {'block1_conv1': 1.,
-                 'block2_conv1': 0.8,
-                 'block3_conv1': 0.5,
-                 'block4_conv1': 0.3,
-                 'block5_conv1': 0.1}
+style_weights = [1.0,
+                0.8,
+                0.5, 
+                0.3, 
+                0.1]
 
-content_ouputs = ['block4_conv2']
-content_weights = {'block4_conv2': 0.5}
+content_layers = ['conv4_2']
+content_weights = [0.5]
 
 learn_rate = 1e-3
-
 var_weight = 10e-4
+epoch = 2
+
+iter = 1 #int(num_data / b_size)
+b_size = 1
+
+VGG_MEAN = [103.939, 116.779, 123.68]
+
+def preprocess_img(img):
+
+  imgpre = img.copy()
+  imgpre.resize(224, 224, 3)
+  imgpre = np.asarray(imgpre, dtype=np.float32)
+  return imgpre
+
+# gets all content images of certain name 
+def get_content_imgs(name):
+  
+  imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
+
+  for filename in os.listdir('./input_images/'):
+    if (name in filename.split(".")[0]):
+      img = cv2.imread(os.path.join('./input_images/',filename))
+      img = preprocess_img(img)
+      imgs[0] = img
+  return imgs
+
+def get_style_img(img):
+  img = cv2.imread('./style_images/' + str(img) + '.jpg', cv2.IMREAD_COLOR)
+  img = preprocess_img(img)
+  return img
 
 def gram_matrix(input_tensor):
   # output[b,c,d] = sum_w input_tensor[b,i,j,c] * input_tensor[b,i,j,c]
@@ -33,33 +67,69 @@ def total_variation_loss(image):
   return tf.reduce_sum(tf.abs(x_deltas)) + tf.reduce_sum(tf.abs(y_deltas))
 
 with tf.device('/gpu:0'):
+  input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
+  #print('img2 shape: {}'.format(input.shape))
+  style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='style_img')
 
-  input = tf.placeholder(tf.float32, shape=[batchsize, 224, 224, 3], name='input')
-  style_img = tf.placeholder(tf.float32, shape=[batchsize, 224, 224, 3], name='target')
+  # initialise net 
+  trans_net = transformer(input)
 
-  output = transformer(input)
+  output = trans_net(input)
   vgg_outp = vgg19(output)
 
   vgg_style = vgg19(style_img)
   vgg_content = vgg19(input)
   
-  style_outputs = [gram_matrix(vgg_style.style_output) for style_output in style_layers]
-  style_targets = [gram_matrix(vgg_outp.style_output) for style_output in style_layers]
+  #for style_output in style_layers:
+  style_outputs = [gram_matrix(vgg_style.__dict__[style_output]) for style_output in style_layers]
+  style_targets = [gram_matrix(vgg_outp.__dict__[style_output]) for style_output in style_layers]
 
-  content_outputs = [(vgg_content.content_output) for content_output in content_layers]
-  content_targets = [(vgg_outp.content_output) for content_output in content_layers]
-  
-  style_loss = tf.zeros(batchsize, tf.float32)
-  for i in style_outputs.len():
+  content_outputs = [(vgg_content.__dict__[content_output]) for content_output in content_layers]
+  content_targets = [(vgg_outp.__dict__[content_output]) for content_output in content_layers]
+
+  style_loss = tf.zeros(b_size, tf.float32)
+  for i in range(len(style_outputs)):
       style_loss += style_weights[i] * tf.reduce_mean(tf.subtract(style_targets[i], style_outputs[i]) ** 2, [1, 2])
   
-  content_loss = tf.zeros(batchsize, tf.float32)
-  for i in content_layers.len():
-    content_loss += content_weights[i] * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2])
+  content_loss = tf.zeros(b_size, tf.float32)
+  for i in range(len(content_layers)):
+    content_loss += content_weights[i] * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
 
   var_loss = var_weight * total_variation_loss(output)
-
+  print('var loss: {}'.format(var_loss))
+  print('style loss: {}'.format(style_loss))
+  print('content loss: {}'.format(content_loss))
   total_loss = style_loss + content_loss + var_loss
 
   train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
 
+with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
+
+  tf.global_variables_initializer().run()
+
+  style = get_style_img('lions')
+  # dict must be array elements 
+  style_np = [style for x in range(b_size)]
+  print(style_np)
+  print('len: {}'.format(len(style_np)))
+
+  for e in range(0, epoch):
+    inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
+    #print('imgs: {}'.format(len(imgs)))
+    #print('styl: {}'.format(len(style_np)))
+    #print('loss: {}'.format(total_loss))
+
+    # gets all content images you need 
+    imgs = get_content_imgs('angery')
+    print('img length: {}'.format(len(imgs)))
+    for i in range(iter):
+      for j in range(b_size):
+        print('j: {}'.format(j))
+        print('i: {}'.format(i))
+        #print(inp_imgs[j].shape)
+        #print(imgs[i * b_size + j].shape)
+        inp_imgs[j] = imgs[i * b_size + j]
+      #print('img shape: {}'.format(imgs[0].shape))
+      dict = {input: inp_imgs, style_img: style_np}
+      loss, _ = sess.run([total_loss, train], feed_dict=dict)
+      print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))
