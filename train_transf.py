@@ -25,8 +25,12 @@ learn_rate = 1e-3
 var_weight = 10e-4
 epoch = 2
 
-iter = 1 #int(num_data / b_size)
-b_size = 1
+list = os.listdir('./training_dataset2') # dir is your directory path
+num_data = len(list)
+
+#iter = int(num_data / b_size)
+# frames in one vid 
+b_size = 5
 
 VGG_MEAN = [103.939, 116.779, 123.68]
 
@@ -47,6 +51,19 @@ def get_content_imgs(name):
       img = cv2.imread(os.path.join('./input_images/',filename))
       img = preprocess_img(img)
       imgs[0] = img
+  return imgs
+
+def get_train_imgs(name):
+  
+  imgs = np.zeros((num_data, 224, 224, 3), dtype=np.float32)
+
+  for filename in os.listdir('./training_dataset2/'):
+    ind = 0;
+    if (name in filename.split(".")[0]):
+      img = cv2.imread(os.path.join('./training_dataset2/',filename))
+      img = preprocess_img(img)
+      imgs[ind] = img
+      ind += 1
   return imgs
 
 def get_style_img(img):
@@ -113,23 +130,20 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
   print(style_np)
   print('len: {}'.format(len(style_np)))
 
+  # gets all content images you need - video frames
+  imgs = get_train_imgs('vid_frames')
+  print('img length: {}'.format(len(imgs)))
+
   for e in range(0, epoch):
     inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
-    #print('imgs: {}'.format(len(imgs)))
-    #print('styl: {}'.format(len(style_np)))
-    #print('loss: {}'.format(total_loss))
 
-    # gets all content images you need 
-    imgs = get_content_imgs('angery')
-    print('img length: {}'.format(len(imgs)))
+    iter = int(num_data / b_size)
+
     for i in range(iter):
       for j in range(b_size):
-        print('j: {}'.format(j))
-        print('i: {}'.format(i))
-        #print(inp_imgs[j].shape)
-        #print(imgs[i * b_size + j].shape)
+        #print('j: {}'.format(j))
+        #print('i: {}'.format(i))
         inp_imgs[j] = imgs[i * b_size + j]
-      #print('img shape: {}'.format(imgs[0].shape))
       dict = {input: inp_imgs, style_img: style_np}
       loss, _ = sess.run([total_loss, train], feed_dict=dict)
       print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))

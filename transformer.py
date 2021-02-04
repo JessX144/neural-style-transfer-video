@@ -28,7 +28,10 @@ def conv_tranpose(self_v, net, num_filters, filter_size, num_str, relu=True, bat
 
 def batch_norm(x):
     mean, var = tf.nn.moments(x, axes=[1, 2, 3])
-    var = tf.reshape(var, [1,1])
+
+    mean = tf.math.reduce_mean(mean)
+    var = tf.math.reduce_std(var)**2
+
     return tf.nn.batch_normalization(x, mean, var, 0, 1, 1e-5)
 
 def residual_b(self_v, net, filter_size=3):
