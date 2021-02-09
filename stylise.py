@@ -2,18 +2,19 @@ import numpy as np
 import tensorflow as tf
 import cv2
 from PIL import Image
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import vgg19 
 from transformer import transformer
 
-# To avoid having to train the model, we take pretrained weights 
-model_weights = 'vgg19.npy'
+from variables import b_size, epoch
 
 input_dir = './input_images/'
 style_dir = './style_images/'
 
 def get_img(img, img_dir):
-	img = cv2.imread(img_dir + str(img) + '.jpg', cv2.IMREAD_COLOR)
+	img = Image.open(img_dir + str(img) + '.jpg').convert('RGB')
 	return img
 
 def write_img(img_name, img):
@@ -21,27 +22,57 @@ def write_img(img_name, img):
 	return img
 
 def process_img(img):
-	return img
+	img = np.asarray(img.resize((224, 224)), dtype=np.float32)
+	arrays = [img for _ in range(b_size)]
+	inp_img = np.stack(arrays, axis=0)
+	return inp_img
+
+# reverse processing 
+def unprocess_img(img, style_name, input_name, input_shape):
+	#print("img.shape:")
+	#print(img.shape)
+	img = img[0]
+	im = Image.fromarray(np.uint8(img))
+	im = im.resize((input_shape[0], input_shape[1]))
+	write_img('{}_{}'.format(input_name, style_name), img)
 
 def stylise(img, style):
-  with tf.device('/gpu:0'):
+	with tf.device('/gpu:0'):
+		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
-    style_img = get_img(style, style_dir)
-    input_image = get_img(img, input_dir)
+			input_img = get_img(img, input_dir)
+			input_shape = np.array(input_img).shape
+			input_img = process_img(input_img)
 
-    img = np.zeros((1, 224, 224, 3), dtype=np.float32)
+			input_checkpoint = './checkpts/{}/{}-{}'.format(style, style, epoch)
+			saver = tf.train.import_meta_graph(input_checkpoint + '.meta')
+			saver.restore(sess, input_checkpoint)
+			graph = tf.get_default_graph()
 
-    # first element in batch 
-    img[0] = np.asarray(Image.fromarray(input_image).convert('RGB').resize((224, 224)), np.float32)
-    vgg19.vgg19(img)  
+			tf.global_variables_initializer().run()	
+			tf.local_variables_initializer().run()	
 
-    #write_img(img, input_img)
-    #write_img(style, style_img)
-    transformer(img)
-    return img
+			#print(sess.run(graph.get_tensor_by_name(':0')))
+						
+			input_image_ten = graph.get_tensor_by_name('input:0')
+			output_ten = graph.get_tensor_by_name('output:0')
+			#output_ten1 = graph.get_tensor_by_name('output1:0')
+			#output_ten2 = graph.get_tensor_by_name('output2:0')
+			#output_ten3 = graph.get_tensor_by_name('output3:0')
+
+			out = sess.run(output_ten, feed_dict={input_image_ten: input_img})
+			#out1 = sess.run(output_ten1, feed_dict={input_image_ten: input_img})
+			#out2 = sess.run(output_ten2, feed_dict={input_image_ten: input_img})
+			#out3 = sess.run(output_ten3, feed_dict={input_image_ten: input_img})
+
+			#print(out1)
+			#print(out2)
+			#print(out3)
+
+			unprocess_img(out, style, img, input_shape)
 
 def main():
-  stylise("cloud","lions")
+	stylise("jake","lions")
 
 if __name__ == "__main__":
-    main()
+		main()

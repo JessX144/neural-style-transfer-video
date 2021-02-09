@@ -1,10 +1,14 @@
 ﻿# TRAINS TRANSFORMER NET 
 import tensorflow as tf
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from transformer import transformer
 from vgg19 import vgg19
 import cv2
 import numpy as np
+from PIL import Image
+
+from variables import b_size, epoch
 
 style_layers = ['conv1_1',
                 'conv2_1',
@@ -21,55 +25,41 @@ style_weights = [1.0,
 content_layers = ['conv4_2']
 content_weights = [0.5]
 
-learn_rate = 1e-3
+learn_rate = 1e-2
 var_weight = 10e-4
-epoch = 2
 
 list = os.listdir('./training_dataset2') # dir is your directory path
 num_data = len(list)
 
-#iter = int(num_data / b_size)
-# frames in one vid 
-b_size = 5
-
 VGG_MEAN = [103.939, 116.779, 123.68]
+
+style_name = 'lions'
 
 def preprocess_img(img):
 
-  imgpre = img.copy()
-  imgpre.resize(224, 224, 3)
-  imgpre = np.asarray(imgpre, dtype=np.float32)
-  return imgpre
-
-# gets all content images of certain name 
-def get_content_imgs(name):
-  
-  imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
-
-  for filename in os.listdir('./input_images/'):
-    if (name in filename.split(".")[0]):
-      img = cv2.imread(os.path.join('./input_images/',filename))
-      img = preprocess_img(img)
-      imgs[0] = img
-  return imgs
+	imgpre = img.copy()
+	imgpre = imgpre.resize((224, 224))
+	imgpre = np.asarray(imgpre, dtype=np.float32)
+	
+	return imgpre
 
 def get_train_imgs(name):
   
-  imgs = np.zeros((num_data, 224, 224, 3), dtype=np.float32)
-
-  for filename in os.listdir('./training_dataset2/'):
-    ind = 0;
-    if (name in filename.split(".")[0]):
-      img = cv2.imread(os.path.join('./training_dataset2/',filename))
-      img = preprocess_img(img)
-      imgs[ind] = img
-      ind += 1
-  return imgs
+	imgs = np.zeros((num_data, 224, 224, 3), dtype=np.float32)
+	ind = 0;
+	for filename in os.listdir('./training_dataset2/'):
+		if (name in filename.split(".")[0]):
+			img = Image.open(os.path.join('./training_dataset2/',filename)).convert('RGB')
+			print(filename)
+			img = preprocess_img(img)
+			imgs[ind] = img
+			ind += 1
+	return imgs
 
 def get_style_img(img):
-  img = cv2.imread('./style_images/' + str(img) + '.jpg', cv2.IMREAD_COLOR)
-  img = preprocess_img(img)
-  return img
+	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
+	img = preprocess_img(img)
+	return img
 
 def gram_matrix(input_tensor):
   # output[b,c,d] = sum_w input_tensor[b,i,j,c] * input_tensor[b,i,j,c]
@@ -83,9 +73,14 @@ def total_variation_loss(image):
   y_deltas = image[:,1:,:,:] - image[:,:-1,:,:]
   return tf.reduce_sum(tf.abs(x_deltas)) + tf.reduce_sum(tf.abs(y_deltas))
 
+# Saver can't operate on GPU
+input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
+tf.identity(input, name="input")
+trans_net = transformer(input)
+saver = tf.train.Saver()
+saver = tf.train.Saver(restore_sequentially=True)
+
 with tf.device('/gpu:0'):
-  input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
-  #print('img2 shape: {}'.format(input.shape))
   style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='style_img')
 
   # initialise net 
@@ -113,37 +108,43 @@ with tf.device('/gpu:0'):
     content_loss += content_weights[i] * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
 
   var_loss = var_weight * total_variation_loss(output)
-  print('var loss: {}'.format(var_loss))
-  print('style loss: {}'.format(style_loss))
-  print('content loss: {}'.format(content_loss))
+  #print('var loss: {}'.format(var_loss))
+  #print('style loss: {}'.format(style_loss))
+  #print('content loss: {}'.format(content_loss))
   total_loss = style_loss + content_loss + var_loss
 
   train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
 
 with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
-  tf.global_variables_initializer().run()
+	ckpt_directory = './checkpts/{}/'.format(style_name)
+	if not os.path.exists(ckpt_directory):
+		os.makedirs(ckpt_directory)
 
-  style = get_style_img('lions')
+	tf.global_variables_initializer().run()	
+
+	style = get_style_img(style_name)
   # dict must be array elements 
-  style_np = [style for x in range(b_size)]
-  print(style_np)
-  print('len: {}'.format(len(style_np)))
+	style_np = [style for x in range(b_size)]
+	#print(style_np)
+	print('len: {}'.format(len(style_np)))
 
   # gets all content images you need - video frames
-  imgs = get_train_imgs('vid_frames')
-  print('img length: {}'.format(len(imgs)))
+	imgs = get_train_imgs('frame')
+	print('img length: {}'.format(len(imgs)))
 
-  for e in range(0, epoch):
-    inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
+	for e in range(epoch):
+		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
 
-    iter = int(num_data / b_size)
+		iter = int(num_data / b_size)
 
-    for i in range(iter):
-      for j in range(b_size):
-        #print('j: {}'.format(j))
-        #print('i: {}'.format(i))
-        inp_imgs[j] = imgs[i * b_size + j]
-      dict = {input: inp_imgs, style_img: style_np}
-      loss, _ = sess.run([total_loss, train], feed_dict=dict)
-      print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))
+		for i in range(iter):
+			for j in range(b_size):
+				inp_imgs[j] = imgs[i * b_size + j]
+			dict = {input: inp_imgs, style_img: style_np}
+			loss, _ = sess.run([total_loss, train], feed_dict=dict)
+			print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))
+	saver.save(sess, ckpt_directory + style_name, global_step=e)
+
+		#for i in range(4):
+		#	cv2.imwrite('./output_images/{}_output.jpg'.format(i), inp_imgs[i])

@@ -31,6 +31,9 @@ class vgg19():
 
     VGG_MEAN = [103.939, 116.779, 123.68]
 
+    print("input shape:")
+    print(input_img.shape)
+
     # splits (1, 224, 224, 3) into its 3 channels each (1, 224, 224, 1)
     r_channel, g_channel, b_channel = tf.split(input_img, 3, 3)
     # Convert RGB to BGR, subtract training dataset mean values 
