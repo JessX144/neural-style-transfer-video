@@ -5,6 +5,9 @@ import tensorflow as tf, pdb
 
 from variables import norm
 
+# VERY IMPORTANT
+conv_std = 0.05
+
 def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
 		net = tf.nn.conv2d(input=net, filters=self_v, strides=[1, num_str, num_str, 1], padding='SAME')
 		if relu:
@@ -48,8 +51,8 @@ def init_conv(net, out_ch, filter_size, name, transpose=False):
 	else:
 			transp_shape = [filter_size, filter_size, out_ch, cols]
 
-	# random values with 0.001 standard dev 
-	init_val = tf.Variable(tf.random.truncated_normal(transp_shape, 0.001), dtype=tf.float32)
+	# random values with standard dev 
+	init_val = tf.Variable(tf.random.truncated_normal(transp_shape, conv_std), dtype=tf.float32)
 	return tf.Variable(init_val, name=name)
 
 def init_vars(net, out_ch, filter_size, name, transpose=False):
@@ -64,7 +67,7 @@ def init_vars(net, out_ch, filter_size, name, transpose=False):
 	else:
 			init_shape = [filter_size, filter_size, out_ch, cols]
 
-	init_weight = tf.Variable(tf.random.truncated_normal(init_shape, 0.001), dtype=tf.float32)
+	init_weight = tf.Variable(tf.random.truncated_normal(init_shape, conv_std), dtype=tf.float32)
 	return tf.Variable(init_weight, name=name)
 
 class transformer():

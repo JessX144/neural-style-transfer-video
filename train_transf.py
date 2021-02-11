@@ -25,7 +25,7 @@ style_weights = [1.0,
 content_layers = ['conv4_2']
 content_weights = [0.5]
 
-learn_rate = 1e-2
+learn_rate = 1e-3
 var_weight = 10e-4
 
 tr = './training_dataset2/'
