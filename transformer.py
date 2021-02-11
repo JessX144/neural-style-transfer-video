@@ -3,15 +3,21 @@
 
 import tensorflow as tf, pdb
 
-def conv(self_v, net, num_filters, filter_size, num_str, relu=True, batchnorm=True):
+from variables import norm
+
+def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
 		net = tf.nn.conv2d(input=net, filters=self_v, strides=[1, num_str, num_str, 1], padding='SAME')
 		if relu:
 				net = tf.nn.relu(net)
-		if batchnorm:
+		if (norm == "b"):
+			print("batch")
 			net = tf.layers.batch_normalization(net)
+		elif (norm == "i"):
+			print("instance")
+			net = tf.contrib.layers.instance_norm(net)
 		return net
 
-def conv_tranpose(self_v, net, num_filters, filter_size, num_str, relu=True, batchnorm=True):		
+def conv_tranpose(self_v, net, num_filters, filter_size, num_str, relu=True, batchnorm=False, instancenorm=True):		
 		batch, rows, cols, ch = [i for i in net.get_shape()]
 
 		new_rows, new_cols = rows * num_str, cols * num_str
@@ -22,8 +28,12 @@ def conv_tranpose(self_v, net, num_filters, filter_size, num_str, relu=True, bat
 		net = tf.nn.conv2d_transpose(net, self_v, tf_shape, [1,num_str,num_str,1], padding='SAME')
 		if relu:
 			net = tf.nn.relu(net)
-		if batchnorm:
+		if (norm == "b"):
+			print("batch")
 			net = tf.layers.batch_normalization(net)
+		elif (norm == "i"):
+			print("insstance")
+			net = tf.contrib.layers.instance_norm(net)
 		return net
 
 def residual_b(self_v, net, filter_size=3):

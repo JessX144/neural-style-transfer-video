@@ -8,17 +8,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import vgg19 
 from transformer import transformer
 
-from variables import b_size, epoch
+from variables import b_size, epoch, sty, cont
 
 input_dir = './input_images/'
 style_dir = './style_images/'
 
 def get_img(img, img_dir):
-	img = Image.open(img_dir + str(img) + '.jpg').convert('RGB')
+	img = Image.open(img_dir + str(img) + '.jpg')#.convert('RGB')
 	return img
 
-def write_img(img_name, img):
-	cv2.imwrite('./output_images/' + img_name + '_output.jpg', img)
+def write_img(img_name, style_name, img):
+	#cv2.imwrite('./output_images/' + img_name + '_output.jpg', img)
+	img.save('./output_images/{}_{}.jpg'.format(img_name, style_name))
 	return img
 
 def process_img(img):
@@ -29,12 +30,13 @@ def process_img(img):
 
 # reverse processing 
 def unprocess_img(img, style_name, input_name, input_shape):
-	#print("img.shape:")
-	#print(img.shape)
 	img = img[0]
 	im = Image.fromarray(np.uint8(img))
-	im = im.resize((input_shape[0], input_shape[1]))
-	write_img('{}_{}'.format(input_name, style_name), img)
+	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
+	# filters for when resizing, change num pixels rather than resize 
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
+
+	write_img(input_name, style_name, im)
 
 def stylise(img, style):
 	with tf.device('/gpu:0'):
@@ -44,7 +46,7 @@ def stylise(img, style):
 			input_shape = np.array(input_img).shape
 			input_img = process_img(input_img)
 
-			input_checkpoint = './checkpts/{}/{}-{}'.format(style, style, epoch)
+			input_checkpoint = './checkpts/{}/{}-{}'.format(style, style, epoch-1)
 			saver = tf.train.import_meta_graph(input_checkpoint + '.meta')
 			saver.restore(sess, input_checkpoint)
 			graph = tf.get_default_graph()
@@ -68,11 +70,10 @@ def stylise(img, style):
 			#print(out1)
 			#print(out2)
 			#print(out3)
-
 			unprocess_img(out, style, img, input_shape)
 
 def main():
-	stylise("jake","lions")
+	stylise(cont, sty)
 
 if __name__ == "__main__":
 		main()

@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from variables import b_size, epoch
+from variables import b_size, epoch, sty
 
 style_layers = ['conv1_1',
                 'conv2_1',
@@ -28,12 +28,9 @@ content_weights = [0.5]
 learn_rate = 1e-2
 var_weight = 10e-4
 
+tr = './training_dataset2/'
 list = os.listdir('./training_dataset2') # dir is your directory path
 num_data = len(list)
-
-VGG_MEAN = [103.939, 116.779, 123.68]
-
-style_name = 'lions'
 
 def preprocess_img(img):
 
@@ -44,20 +41,16 @@ def preprocess_img(img):
 	return imgpre
 
 def get_train_imgs(name):
-  
-	imgs = np.zeros((num_data, 224, 224, 3), dtype=np.float32)
-	ind = 0;
-	for filename in os.listdir('./training_dataset2/'):
+	imgs = []
+	# cannot give all imgs, memory error, use list 
+	for filename in list:
 		if (name in filename.split(".")[0]):
-			img = Image.open(os.path.join('./training_dataset2/',filename)).convert('RGB')
-			print(filename)
-			img = preprocess_img(img)
-			imgs[ind] = img
-			ind += 1
+			imgs.append(tr + filename)
 	return imgs
 
 def get_style_img(img):
-	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
+	#img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
+	img = Image.open('./style_images/' + str(img) + '.jpg')
 	img = preprocess_img(img)
 	return img
 
@@ -117,34 +110,34 @@ with tf.device('/gpu:0'):
 
 with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
-	ckpt_directory = './checkpts/{}/'.format(style_name)
+	ckpt_directory = './checkpts/{}/'.format(sty)
 	if not os.path.exists(ckpt_directory):
 		os.makedirs(ckpt_directory)
 
 	tf.global_variables_initializer().run()	
 
-	style = get_style_img(style_name)
+	style = get_style_img(sty)
   # dict must be array elements 
 	style_np = [style for x in range(b_size)]
-	#print(style_np)
-	print('len: {}'.format(len(style_np)))
 
   # gets all content images you need - video frames
 	imgs = get_train_imgs('frame')
 	print('img length: {}'.format(len(imgs)))
 
+	iter = int(num_data / b_size)
+
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
 
-		iter = int(num_data / b_size)
-
 		for i in range(iter):
 			for j in range(b_size):
-				inp_imgs[j] = imgs[i * b_size + j]
+				im = imgs[i * b_size + j]
+				#inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
+				inp_imgs[j] = preprocess_img(Image.open(im))
 			dict = {input: inp_imgs, style_img: style_np}
 			loss, _ = sess.run([total_loss, train], feed_dict=dict)
 			print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))
-	saver.save(sess, ckpt_directory + style_name, global_step=e)
+	saver.save(sess, ckpt_directory + sty, global_step=e)
 
 		#for i in range(4):
 		#	cv2.imwrite('./output_images/{}_output.jpg'.format(i), inp_imgs[i])
