@@ -14,11 +14,10 @@ input_dir = './input_images/'
 style_dir = './style_images/'
 
 def get_img(img, img_dir):
-	img = Image.open(img_dir + str(img) + '.jpg')#.convert('RGB')
+	img = Image.open(img_dir + str(img) + '.jpg').convert('RGB')
 	return img
 
 def write_img(img_name, style_name, img):
-	#cv2.imwrite('./output_images/' + img_name + '_output.jpg', img)
 	img.save('./output_images/{}_{}.jpg'.format(img_name, style_name))
 	return img
 
@@ -31,10 +30,11 @@ def process_img(img):
 # reverse processing 
 def unprocess_img(img, style_name, input_name, input_shape):
 	img = img[0]
+	print(img)
 	im = Image.fromarray(np.uint8(img))
 	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
 	# filters for when resizing, change num pixels rather than resize 
-	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.LANCZOS)
 
 	write_img(input_name, style_name, im)
 
@@ -51,25 +51,13 @@ def stylise(img, style):
 			saver.restore(sess, input_checkpoint)
 			graph = tf.get_default_graph()
 
-			tf.global_variables_initializer().run()	
-			tf.local_variables_initializer().run()	
-
 			#print(sess.run(graph.get_tensor_by_name(':0')))
 						
 			input_image_ten = graph.get_tensor_by_name('input:0')
 			output_ten = graph.get_tensor_by_name('output:0')
-			#output_ten1 = graph.get_tensor_by_name('output1:0')
-			#output_ten2 = graph.get_tensor_by_name('output2:0')
-			#output_ten3 = graph.get_tensor_by_name('output3:0')
 
 			out = sess.run(output_ten, feed_dict={input_image_ten: input_img})
-			#out1 = sess.run(output_ten1, feed_dict={input_image_ten: input_img})
-			#out2 = sess.run(output_ten2, feed_dict={input_image_ten: input_img})
-			#out3 = sess.run(output_ten3, feed_dict={input_image_ten: input_img})
-
-			#print(out1)
-			#print(out2)
-			#print(out3)
+			
 			unprocess_img(out, style, img, input_shape)
 
 def main():

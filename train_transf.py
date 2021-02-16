@@ -1,4 +1,5 @@
-﻿# TRAINS TRANSFORMER NET 
+﻿
+# TRAINS TRANSFORMER NET 
 import tensorflow as tf
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -10,20 +11,24 @@ from PIL import Image
 
 from variables import b_size, epoch, sty
 
-style_layers = ['conv1_1',
-                'conv2_1',
-                'conv3_1', 
-                'conv4_1', 
-                'conv5_1']
+#style_layers = ['conv1_1',
+#								'conv2_1',
+#								'conv3_1', 
+#								'conv4_1', 
+#								'conv5_1']
 
-style_weights = [1.0,
-                0.8,
-                0.5, 
-                0.3, 
-                0.1]
+style_layers = ['conv1_2',
+								'conv2_2',
+								'conv3_3', 
+								'conv4_3', 
+								'conv5_3']
 
-content_layers = ['conv4_2']
-content_weights = [0.5]
+style_weight = 1e1
+
+#content_layers = ['conv4_2']
+content_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+
+content_weight = 1e0
 
 learn_rate = 1e-3
 var_weight = 10e-4
@@ -49,64 +54,59 @@ def get_train_imgs(name):
 	return imgs
 
 def get_style_img(img):
-	#img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
-	img = Image.open('./style_images/' + str(img) + '.jpg')
+	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
+	#img = Image.open('./style_images/' + str(img) + '.jpg')
 	img = preprocess_img(img)
 	return img
 
-def gram_matrix(input_tensor):
-  # output[b,c,d] = sum_w input_tensor[b,i,j,c] * input_tensor[b,i,j,c]
-  result = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
-  input_shape = tf.shape(input_tensor)
-  num_locations = tf.cast(input_shape[1]*input_shape[2], tf.float32)
-  return result/(num_locations)
+def gram_matrix(x):
+    b, h, w, ch = x.get_shape().as_list()
+    features = tf.reshape(x, [b, h*w, ch])
+    gram = tf.matmul(features, features, adjoint_a=True)/tf.constant(ch*w*h, tf.float32)
+    return gram
 
-def total_variation_loss(image):
-  x_deltas = image[:,:,1:,:] - image[:,:,:-1,:]
-  y_deltas = image[:,1:,:,:] - image[:,:-1,:,:]
-  return tf.reduce_sum(tf.abs(x_deltas)) + tf.reduce_sum(tf.abs(y_deltas))
-
-# Saver can't operate on GPU
-input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
-tf.identity(input, name="input")
-trans_net = transformer(input)
-saver = tf.train.Saver()
-saver = tf.train.Saver(restore_sequentially=True)
+def total_variation_loss(x, beta=1):
+    wh = tf.constant([[[[ 1], [ 1], [ 1]]], [[[-1], [-1], [-1]]]], tf.float32)
+    ww = tf.constant([[[[ 1], [ 1], [ 1]], [[-1], [-1], [-1]]]], tf.float32)
+    dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], 'SAME')
+    dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], 'SAME')
+    loss = (tf.add(tf.reduce_sum(dh**2, [1, 2, 3]), tf.reduce_sum(dw**2, [1, 2, 3]))) ** (beta / 2.)
+    return loss
 
 with tf.device('/gpu:0'):
-  style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='style_img')
 
-  # initialise net 
-  trans_net = transformer(input)
+	input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
+	# initialise net
+	trans_net = transformer(input)
+	saver = tf.train.Saver(restore_sequentially=True)
 
-  output = trans_net(input)
-  vgg_outp = vgg19(output)
+	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3])
 
-  vgg_style = vgg19(style_img)
-  vgg_content = vgg19(input)
-  
-  #for style_output in style_layers:
-  style_outputs = [gram_matrix(vgg_style.__dict__[style_output]) for style_output in style_layers]
-  style_targets = [gram_matrix(vgg_outp.__dict__[style_output]) for style_output in style_layers]
+	output = trans_net(input)
 
-  content_outputs = [(vgg_content.__dict__[content_output]) for content_output in content_layers]
-  content_targets = [(vgg_outp.__dict__[content_output]) for content_output in content_layers]
+	vgg_style = vgg19(style_img)
+	vgg_content = vgg19(input)
+	vgg_outp = vgg19(output)
+	
+	style_outputs = [gram_matrix(vgg_style.__dict__[style_output]) for style_output in style_layers]
+	style_targets = [gram_matrix(vgg_outp.__dict__[style_output]) for style_output in style_layers]
 
-  style_loss = tf.zeros(b_size, tf.float32)
-  for i in range(len(style_outputs)):
-      style_loss += style_weights[i] * tf.reduce_mean(tf.subtract(style_targets[i], style_outputs[i]) ** 2, [1, 2])
-  
-  content_loss = tf.zeros(b_size, tf.float32)
-  for i in range(len(content_layers)):
-    content_loss += content_weights[i] * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
+	content_outputs = [(vgg_content.__dict__[content_output]) for content_output in content_layers]
+	content_targets = [(vgg_outp.__dict__[content_output]) for content_output in content_layers]
 
-  var_loss = var_weight * total_variation_loss(output)
-  #print('var loss: {}'.format(var_loss))
-  #print('style loss: {}'.format(style_loss))
-  #print('content loss: {}'.format(content_loss))
-  total_loss = style_loss + content_loss + var_loss
+	style_loss = tf.zeros(b_size, tf.float32)
+	for i in range(len(style_outputs)):
+			style_loss += style_weight * tf.reduce_mean(tf.subtract(style_targets[i], style_outputs[i]) ** 2, [1, 2])
+	
+	content_loss = tf.zeros(b_size, tf.float32)
+	for i in range(len(content_layers)):
+		content_loss += content_weight * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
 
-  train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
+	var_loss = var_weight * total_variation_loss(output)
+
+	total_loss = style_loss + content_loss + var_loss
+
+	train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
 
 with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
@@ -117,10 +117,10 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 	tf.global_variables_initializer().run()	
 
 	style = get_style_img(sty)
-  # dict must be array elements 
+	# dict must be array elements 
 	style_np = [style for x in range(b_size)]
 
-  # gets all content images you need - video frames
+	# gets all content images you need - video frames
 	imgs = get_train_imgs('frame')
 	print('img length: {}'.format(len(imgs)))
 
@@ -128,16 +128,11 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
-
 		for i in range(iter):
 			for j in range(b_size):
 				im = imgs[i * b_size + j]
-				#inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
-				inp_imgs[j] = preprocess_img(Image.open(im))
+				inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
 			dict = {input: inp_imgs, style_img: style_np}
 			loss, _ = sess.run([total_loss, train], feed_dict=dict)
-			print('[iter {}/{}] loss: {}'.format(i + 1, iter, loss[0]))
+			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
 	saver.save(sess, ckpt_directory + sty, global_step=e)
-
-		#for i in range(4):
-		#	cv2.imwrite('./output_images/{}_output.jpg'.format(i), inp_imgs[i])

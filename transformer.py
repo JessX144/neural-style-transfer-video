@@ -5,108 +5,100 @@ import tensorflow as tf, pdb
 
 from variables import norm
 
-# VERY IMPORTANT
-conv_std = 0.05
+def batch_norm(x):
+		mean, var = tf.nn.moments(x, axes=[1, 2, 3])
+		var = tf.reshape(var, [1,1])
+		return tf.nn.batch_normalization(x, mean, var, 0, 1, 1e-5)
 
 def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
-		net = tf.nn.conv2d(input=net, filters=self_v, strides=[1, num_str, num_str, 1], padding='SAME')
-		if relu:
-				net = tf.nn.relu(net)
-		if (norm == "b"):
-			print("batch")
-			net = tf.layers.batch_normalization(net)
-		elif (norm == "i"):
-			print("instance")
-			net = tf.contrib.layers.instance_norm(net)
-		return net
-
-def conv_tranpose(self_v, net, num_filters, filter_size, num_str, relu=True, batchnorm=False, instancenorm=True):		
-		batch, rows, cols, ch = [i for i in net.get_shape()]
-
-		new_rows, new_cols = rows * num_str, cols * num_str
+		net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='SAME')
 		
-		new_shape = [batch, new_rows, new_cols, num_filters]
-		tf_shape = tf.stack(new_shape)
-
-		net = tf.nn.conv2d_transpose(net, self_v, tf_shape, [1,num_str,num_str,1], padding='SAME')
-		if relu:
+		if (relu):
 			net = tf.nn.relu(net)
+
 		if (norm == "b"):
-			print("batch")
-			net = tf.layers.batch_normalization(net)
+			net = batch_norm(net)
 		elif (norm == "i"):
-			print("insstance")
 			net = tf.contrib.layers.instance_norm(net)
+		elif (norm == "l"):
+			net = tf.contrib.layers.layer_norm(net)
 		return net
 
-def residual_b(self_v, net, filter_size=3):
-		h = conv(self_v, net, 128, filter_size, 1)
-		# self + conv
-		return net + conv(self_v, h, 128, filter_size, 1, relu=False)
+def conv_tranpose(self_v, net, num_filters, num_str, relu=True, normalise=True):		
+		batch, rows, cols, ch = [i for i in net.get_shape()]
+		new_rows = rows * num_str
+		new_cols = cols * num_str
+		new_shape = [batch, new_rows, new_cols, num_filters]
 
-def init_conv(net, out_ch, filter_size, name, transpose=False):
-	batch, rows, cols, ch = [i for i in net.get_shape()]
-	if not transpose:
-			transp_shape = [filter_size, filter_size, ch, out_ch]
-	else:
-			transp_shape = [filter_size, filter_size, out_ch, cols]
+		net = tf.nn.conv2d_transpose(net, self_v, new_shape, [1,num_str,num_str,1], padding='SAME')
+		
+		if (relu):
+			net = tf.nn.relu(net)
 
-	# random values with standard dev 
-	init_val = tf.Variable(tf.random.truncated_normal(transp_shape, conv_std), dtype=tf.float32)
-	return tf.Variable(init_val, name=name)
+		if (normalise):
+			if (norm == "b"):
+				net = batch_norm(net)
+			elif (norm == "i"):
+				net = tf.contrib.layers.instance_norm(net)
+			elif (norm == "l"):
+				net = tf.contrib.layers.layer_norm(net)
+		return net
+
+class res():
+	def __init__(self, x, i, j, n):
+		self.w1 = init_vars(x, i, j, n)
+		self.w2 = init_vars(x, i, j, n)
+	def __call__(self_v, im):
+		r = tf.nn.relu(batch_norm(tf.nn.conv2d(im, self_v.w1, [1, 1, 1, 1], 'SAME')))
+		r = batch_norm(tf.nn.conv2d(r, self_v.w2, [1, 1, 1, 1], 'SAME'))
+		return im + r
 
 def init_vars(net, out_ch, filter_size, name, transpose=False):
-
-	#print("shape:")
-	#print(net.get_shape())
-
 	batch, rows, cols, ch = [i for i in net.get_shape()]
-
-	if not transpose:
-			init_shape = [filter_size, filter_size, ch, out_ch]
-	else:
+	if transpose:
 			init_shape = [filter_size, filter_size, out_ch, cols]
-
-	init_weight = tf.Variable(tf.random.truncated_normal(init_shape, conv_std), dtype=tf.float32)
-	return tf.Variable(init_weight, name=name)
+	else:
+		init_shape = [filter_size, filter_size, ch, out_ch]
+	return tf.Variable(tf.random.truncated_normal(init_shape, stddev=0.001), name=name)
 
 class transformer():
 	# Need to initialise variables to save the graph 
 	def __init__(self, image):
+
 		self.conv1 = init_vars(image, 32, 9, "t_conv1_w")
 		self.conv2 = init_vars(self.conv1, 64, 4, "t_conv2_w")
 		self.conv3 = init_vars(self.conv2, 128, 4, "t_conv3_w")
 
-		self.resid1 = init_vars(self.conv3, 128, 3, "R_conv1_w")
-		self.resid2 = init_vars(self.resid1, 128, 3, "R_conv2_w")
-		self.resid3 = init_vars(self.resid2, 128, 3, "R_conv3_w")
-		self.resid4 = init_vars(self.resid3, 128, 3, "R_conv4_w")
-		self.resid5 = init_vars(self.resid4, 128, 3, "R_conv5_w")
+		self.resid1 = res(self.conv3, 128, 3, "R1_conv1_w")
+		self.resid2 = res(self.conv3, 128, 3, "R2_conv1_w")
+		self.resid3 = res(self.conv3, 128, 3, "R3_conv1_w")
+		self.resid4 = res(self.conv3, 128, 3, "R4_conv1_w")
+		self.resid5 = res(self.conv3, 128, 3, "R5_conv1_w")
 
-		self.conv_t1 = init_vars(self.resid5, 64, 4, "t_dconv1_w", transpose=True)
+		self.conv_t1 = init_vars(self.resid5.w1, 64, 4, "t_dconv1_w", transpose=True)
 		self.conv_t2 = init_vars(self.conv_t1, 32, 4, "t_dconv2_w", transpose=True)
 		self.conv_t3 = init_vars(self.conv_t2, 3, 9, "t_dconv3_w", transpose=True)
 
 	def __call__(self, image):
+
 		# convolution layers 
-		self.conv1 = conv(self.conv1, image, 32, 9, 1)
-		self.conv2 = conv(self.conv2, self.conv1, 64, 3, 2)
-		self.conv3 = conv(self.conv3, self.conv2, 128, 3, 2)
+		image = conv(self.conv1, image, 32, 9, 1)
+		image = conv(self.conv2, image, 64, 3, 2)
+		image = conv(self.conv3, image, 128, 3, 2)
+
 		# residual layers 
-		self.resid1 = residual_b(self.resid1, self.conv3, 3)
-		self.resid2 = residual_b(self.resid2, self.resid1, 3)
-		self.resid3 = residual_b(self.resid3, self.resid2, 3)
-		self.resid4 = residual_b(self.resid4, self.resid3, 3)
-		self.resid5 = residual_b(self.resid5, self.resid4, 3)
+		image = self.resid1(image)
+		image = self.resid2(image)
+		image = self.resid3(image)
+		image = self.resid4(image)
+		image = self.resid5(image)
+
 		# convolutional transpose layers 
-		self.conv_t1 = conv_tranpose(self.conv_t1, self.resid5, 64, 3, 2)
-		self.conv_t2 = conv_tranpose(self.conv_t2, self.conv_t1, 32, 3, 2)
-		self.conv_t3 = conv_tranpose(self.conv_t3, self.conv_t2, 3, 9, 1)
+		image = conv_tranpose(self.conv_t1, image, 64, 2)
+		image = conv_tranpose(self.conv_t2, image, 32, 2)
+		image = conv_tranpose(self.conv_t3, image, 3, 1, relu=False, normalise=False)
 
-		output1 = tf.identity(self.conv1, name='output1')
-		output2 = tf.identity(self.resid1, name='output2')
-		output3 = tf.identity(self.conv_t3, name='output3')
-
-		# output node 
-		output = tf.multiply((tf.tanh(self.conv_t3) + 1), tf.constant(127.5, tf.float32, shape=self.conv_t3.get_shape()), name='output')
+		output = tf.multiply((tf.tanh(image) + 1), tf.constant(127.5, tf.float32, shape=image.get_shape()), name='output') 
+		
+		# (1, 224, 224, 3)
 		return output
