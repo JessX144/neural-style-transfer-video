@@ -7,8 +7,20 @@ from variables import norm
 
 def batch_norm(x):
 		mean, var = tf.nn.moments(x, axes=[1, 2, 3])
-		var = tf.reshape(var, [1,1])
-		return tf.nn.batch_normalization(x, mean, var, 0, 1, 1e-5)
+
+		b_var = tf.reduce_mean(var)
+		b_mean = tf.reduce_mean(mean)
+
+		#var = tf.reshape(var, [1,1])
+		return tf.nn.batch_normalization(x, b_mean, b_var, 0, 1, 1e-5)
+
+def inst_norm(x):
+	mean, var = tf.nn.moments(x, axes=[1, 2])
+
+	i_var = tf.reduce_mean(var)
+	i_mean = tf.reduce_mean(mean)
+
+	return tf.nn.batch_normalization(x, i_mean, i_var, 0, 1, 1e-10)
 
 def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
 		net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='SAME')
@@ -19,9 +31,7 @@ def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
 		if (norm == "b"):
 			net = batch_norm(net)
 		elif (norm == "i"):
-			net = tf.contrib.layers.instance_norm(net)
-		elif (norm == "l"):
-			net = tf.contrib.layers.layer_norm(net)
+			net = inst_norm(net)
 		return net
 
 def conv_tranpose(self_v, net, num_filters, num_str, relu=True, normalise=True):		
@@ -39,9 +49,7 @@ def conv_tranpose(self_v, net, num_filters, num_str, relu=True, normalise=True):
 			if (norm == "b"):
 				net = batch_norm(net)
 			elif (norm == "i"):
-				net = tf.contrib.layers.instance_norm(net)
-			elif (norm == "l"):
-				net = tf.contrib.layers.layer_norm(net)
+				net = inst_norm(net)
 		return net
 
 class res():

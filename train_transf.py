@@ -9,32 +9,32 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from variables import b_size, epoch, sty
+from variables import b_size, epoch
+from argparse import ArgumentParser
+parser = ArgumentParser()
+parser.add_argument('--style', '-s', type=str)
+parser.add_argument('--style_w', '-w', type=float)
+args = parser.parse_args()
 
-#style_layers = ['conv1_1',
-#								'conv2_1',
-#								'conv3_1', 
-#								'conv4_1', 
-#								'conv5_1']
+style_layers = ['conv1_1',
+								'conv2_1',
+								'conv3_1', 
+								'conv4_1', 
+								'conv5_1']
 
-style_layers = ['conv1_2',
-								'conv2_2',
-								'conv3_3', 
-								'conv4_3', 
-								'conv5_3']
+# style_weight = 0.3e1 works for strong styles
+# style_weight = 1e1 works for subtle styles
+style_weight = args.style_w
 
-style_weight = 1e1
-
-#content_layers = ['conv4_2']
-content_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+content_layers = ['conv4_2']
 
 content_weight = 1e0
 
 learn_rate = 1e-3
 var_weight = 10e-4
 
-tr = './training_dataset2/'
-list = os.listdir('./training_dataset2') # dir is your directory path
+tr = './training_dataset_4/'
+list = os.listdir('./training_dataset_4') # dir is your directory path
 num_data = len(list)
 
 def preprocess_img(img):
@@ -65,13 +65,6 @@ def gram_matrix(x):
     gram = tf.matmul(features, features, adjoint_a=True)/tf.constant(ch*w*h, tf.float32)
     return gram
 
-def total_variation_loss(x, beta=1):
-    wh = tf.constant([[[[ 1], [ 1], [ 1]]], [[[-1], [-1], [-1]]]], tf.float32)
-    ww = tf.constant([[[[ 1], [ 1], [ 1]], [[-1], [-1], [-1]]]], tf.float32)
-    dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], 'SAME')
-    dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], 'SAME')
-    loss = (tf.add(tf.reduce_sum(dh**2, [1, 2, 3]), tf.reduce_sum(dw**2, [1, 2, 3]))) ** (beta / 2.)
-    return loss
 
 with tf.device('/gpu:0'):
 
@@ -103,12 +96,15 @@ with tf.device('/gpu:0'):
 		content_loss += content_weight * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
 
 	var_loss = var_weight * total_variation_loss(output)
+	var_loss = var_weight * tf.image.total_variation(output)
 
 	total_loss = style_loss + content_loss + var_loss
 
 	train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
 
 with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
+
+	sty = args.style
 
 	ckpt_directory = './checkpts/{}/'.format(sty)
 	if not os.path.exists(ckpt_directory):
