@@ -49,12 +49,12 @@ def unprocess_img(img, style_name, input_name, input_shape):
 def create_vid(img, video, input_shape):
 	img = img[0]
 	# print(img)
+	img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 	im = Image.fromarray(np.uint8(img))
 	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
 	# filters for when resizing, change num pixels rather than resize 
 	im = im.resize((input_shape[1], input_shape[0]), resample=Image.LANCZOS)
 	# print("written image has size {}, {}".format(input_shape[1], input_shape[0]))
-
 	im = np.array(im)
 
 	video.write(im)
@@ -73,49 +73,27 @@ def stylise(img, style):
 			input_image_ten = graph.get_tensor_by_name('input:0')
 			output_ten = graph.get_tensor_by_name('output:0')
 
-			if (mode == 'v'):
+			dir_name = './input_images/' + img
+			dir_list = os.listdir(dir_name)
 
-				dir_name = './input_images/' + img
-				dir_list = os.listdir(dir_name)
+			first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
 
-				first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
-
-				fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-				video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
+			fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
 			
-				for frame in dir_list:
-					n = frame.split(".")[0]
-					input_img = Image.open(dir_name + '/' + frame).convert('RGB')
+			for frame in dir_list:
+				n = frame.split(".")[0]
+				input_img = Image.open(dir_name + '/' + frame).convert('RGB')
 
-					input_shape = np.array(input_img).shape
-					input_img = process_img(input_img)
-
-					out = sess.run(output_ten, feed_dict={input_image_ten: input_img})
-
-					create_vid(out, video, input_shape)
-
-				video.release()
-				cv2.destroyAllWindows()
-
-			elif (mode == 'i'):
-
-				input_img = get_img(img, input_dir)
 				input_shape = np.array(input_img).shape
 				input_img = process_img(input_img)
 
-				input_checkpoint = './checkpts/{}/{}-{}'.format(style, style, epoch-1)
-				saver = tf.train.import_meta_graph(input_checkpoint + '.meta')
-				saver.restore(sess, input_checkpoint)
-				graph = tf.get_default_graph()
-
-				#print(sess.run(graph.get_tensor_by_name(':0')))
-						
-				input_image_ten = graph.get_tensor_by_name('input:0')
-				output_ten = graph.get_tensor_by_name('output:0')
-
 				out = sess.run(output_ten, feed_dict={input_image_ten: input_img})
-			
-				unprocess_img(out, style, img, input_shape)
+
+				create_vid(out, video, input_shape)
+
+			video.release()
+			cv2.destroyAllWindows()
 
 def main():
 	stylise(cont, sty)

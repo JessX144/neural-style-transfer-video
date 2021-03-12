@@ -23,8 +23,11 @@ def inst_norm(x):
 	return tf.nn.batch_normalization(x, i_mean, i_var, 0, 1, 1e-10)
 
 def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
-		net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='SAME')
-		
+		#net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='SAME')
+		f_size = int(filter_size/2)
+		net = tf.pad(net, [[0,0], [f_size, f_size], [f_size, f_size], [0,0]], mode='REFLECT')
+		net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='VALID')
+
 		if (relu):
 			net = tf.nn.relu(net)
 
@@ -88,6 +91,9 @@ class transformer():
 		self.conv_t3 = init_vars(self.conv_t2, 3, 9, "t_dconv3_w", transpose=True)
 
 	def __call__(self, image):
+		# tf.cast(image, tf.int32)
+		image = tf.pad(image, [[0,0], [10,10], [10,10],[0,0]], mode='REFLECT')
+		# tf.cast(image, tf.float32)
 
 		# convolution layers 
 		image = conv(self.conv1, image, 32, 9, 1)
@@ -108,5 +114,9 @@ class transformer():
 
 		output = tf.multiply((tf.tanh(image) + 1), tf.constant(127.5, tf.float32, shape=image.get_shape()), name='output') 
 		
+		height = tf.shape(output)[1]
+		width = tf.shape(output)[2]
+		output = tf.slice(output, [0, 10, 10, 0], tf.stack([-1, height - 20, width - 20, -1]))
+
 		# (1, 224, 224, 3)
 		return output

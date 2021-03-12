@@ -22,6 +22,9 @@ style_layers = ['conv1_1',
 								'conv4_1', 
 								'conv5_1']
 
+# bash downloadmulticategoryvideos.sh <number-of-videos-per-category> categories.txt
+# bash generatevidframes.sh <path_to_directory_containing_videos> <path_to_directory_to_store_frames> jpg
+
 # style_weight = 0.3e1 works for strong styles
 # style_weight = 1e1 works for subtle styles
 style_weight = args.style_w

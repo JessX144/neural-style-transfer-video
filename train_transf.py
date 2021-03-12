@@ -55,7 +55,6 @@ def get_train_imgs(name):
 
 def get_style_img(img):
 	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
-	#img = Image.open('./style_images/' + str(img) + '.jpg')
 	img = preprocess_img(img)
 	return img
 
@@ -95,7 +94,6 @@ with tf.device('/gpu:0'):
 	for i in range(len(content_layers)):
 		content_loss += content_weight * tf.reduce_mean(tf.subtract(content_targets[i], content_outputs[i]) ** 2, [1, 2, 3])
 
-	var_loss = var_weight * total_variation_loss(output)
 	var_loss = var_weight * tf.image.total_variation(output)
 
 	total_loss = style_loss + content_loss + var_loss
