@@ -8,7 +8,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from argparse import ArgumentParser
 
 import vgg19 
-from transformer import transformer
 
 from variables import b_size, epoch, sty, cont
 
@@ -38,7 +37,7 @@ def process_img(img):
 # reverse processing 
 def unprocess_img(img, style_name, input_name, input_shape):
 	img = img[0]
-	print(img)
+
 	im = Image.fromarray(np.uint8(img))
 	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
 	# filters for when resizing, change num pixels rather than resize 

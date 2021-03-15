@@ -74,7 +74,11 @@ with tf.device('/gpu:0'):
 
 	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3])
 
-	output = trans_net(input)
+	output = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='output')
+	padded_input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='padded_input')
+
+	# original non padded output, sliced padded output 
+	output_og, output, padded_input = trans_net(input)
 
 	vgg_style = vgg19(style_img)
 	vgg_content = vgg19(input)
@@ -127,6 +131,12 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				im = imgs[i * b_size + j]
 				inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
 			dict = {input: inp_imgs, style_img: style_np}
-			loss, _ = sess.run([total_loss, train], feed_dict=dict)
+			loss, out, padded_inp, _ = sess.run([total_loss, output, padded_input, train], feed_dict=dict)
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
+
+			cv2.imshow('output', out[0]/255.0)
+			cv2.waitKey(0)
+			cv2.imshow('padded_input', padded_inp[0]/255.0)
+			cv2.waitKey(0)
+
 	saver.save(sess, ckpt_directory + sty, global_step=e)

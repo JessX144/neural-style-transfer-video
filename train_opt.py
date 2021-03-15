@@ -91,6 +91,7 @@ def get_flow_weights(flow1, flow2):
 
 	size = xSize * ySize
 
+	# prewitt kernel - works with greyscale images, like the optical flow algorithm 
 	x_kernel = [[-0.5, -0.5, -0.5],[0., 0., 0.],[0.5, 0.5, 0.5]]
 	x_kernel = np.array(x_kernel, np.float32)
 	y_kernel = [[-0.5, 0., 0.5],[-0.5, 0., 0.5],[-0.5, 0., 0.5]]
@@ -145,8 +146,8 @@ def get_flow_weights(flow1, flow2):
 			v2 = flow1[ay,ax,1]
 			
 			if ((cx-ax) * (cx-ax) + (cy-ay) * (cy-ay)) >= 0.01 * (u2*u2 + v2*v2 + u*u + v*v) + 0.5: 
-				# Set to a negative value so that when smoothing is applied the smoothing goes "to the outside".
-				# Afterwards, we clip values below 0.
+				# negative value for smoothing to go to outside
+				# clip values below 0 
 				reliable[ay, ax] = -255.0
 				continue
 			
@@ -154,7 +155,7 @@ def get_flow_weights(flow1, flow2):
 				reliable[ay, ax] = MOTION_BOUNDARIE_VALUE
 				continue
 
-	#need to apply smoothing to reliable mat
+	# apply smoothing 
 	reliable = cv2.GaussianBlur(reliable,(3,3),0)
 	reliable = np.clip(reliable, 0.0, 255.0)		
 	return reliable	
