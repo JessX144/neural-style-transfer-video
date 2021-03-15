@@ -124,4 +124,4 @@ class transformer():
 		sliced = tf.slice(output, [0, 10, 10, 0], tf.stack([-1, height - 20, width - 20, -1]))
 
 		# (1, 224, 224, 3)
-		return output, sliced, p_img
+		return output, sliced

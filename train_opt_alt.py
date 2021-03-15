@@ -96,8 +96,8 @@ with tf.device('/gpu:0'):
 
 	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name="style_img")
 
-	output = trans_net(input)
-	noisy_output = trans_net(noisy_inp_im)
+	output_og, output = trans_net(input)
+	noisy_output_og, noisy_output = trans_net(noisy_inp_im)
 
 	vgg_style = vgg19(style_img)
 	vgg_content = vgg19(input)

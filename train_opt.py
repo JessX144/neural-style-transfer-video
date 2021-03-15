@@ -204,7 +204,7 @@ with tf.device('/gpu:0'):
 
 	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name="style_img")
 
-	output = trans_net(input)
+	output_og, output = trans_net(input)
 
 	vgg_style = vgg19(style_img)
 	vgg_content = vgg19(input)
