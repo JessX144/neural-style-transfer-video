@@ -1,1 +1,1 @@
-bash downloadmulticategoryvideos.sh 4 selectedcategories2.txt && bash generateframesfromvideos.sh videos ../training_dataset jpg
+bash downloadmulticategoryvideos.sh 4 selectedcategories.txt && bash generateframesfromvideos.sh videos ../training_dataset jpg

@@ -49,10 +49,3 @@ else
 		done < category-ids/$mid
 fi
 
-trim=trim
-for filename in ./videos/*
-do
-	filen="${filename%.*}"
-	ffmpeg -ss 00:00:00 -t 00:00:20 -i "$filename" -async 1 -vcodec copy -acodec copy "$filen$trim".mp4
-	rm "$filename"
-done
