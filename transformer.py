@@ -92,12 +92,8 @@ class transformer():
 		self.conv_t3 = init_vars(self.conv_t2, 3, 9, "t_dconv3_w", transpose=True)
 
 	def __call__(self, image):
-		# tf.cast(image, tf.int32)
+
 		image = tf.pad(image, [[0,0], [10,10], [10,10],[0,0]], mode='REFLECT')
-		# 1 224 224 3 
-		# 1 244 244 3
-		p_img = tf.pad(image, [[0,0], [10,10], [10,10],[0,0]], mode='REFLECT')
-		# tf.cast(image, tf.float32)
 
 		# convolution layers 
 		image = conv(self.conv1, image, 32, 9, 1)
@@ -121,7 +117,7 @@ class transformer():
 		# 244 244 
 		height = tf.shape(output)[1]
 		width = tf.shape(output)[2]
-		sliced = tf.slice(output, [0, 10, 10, 0], tf.stack([-1, height - 20, width - 20, -1]))
+		output = tf.slice(output, [0, 10, 10, 0], tf.stack([-1, height - 20, width - 20, -1]))
 
 		# (1, 224, 224, 3)
-		return output, sliced
+		return output
