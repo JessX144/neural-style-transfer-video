@@ -46,7 +46,7 @@ def get_train_imgs(name):
 	imgs = []
 	# cannot give all imgs, memory error, use list 
 	for filename in list:
-		if (name in filename.split(".")[0]):
+		if (name in os.path.splitext(filename)[0]):
 			imgs.append(tr + filename)
 	return imgs
 
