@@ -249,8 +249,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				# confidence measure on image
 				grey_in = cv2.cvtColor(inp_imgs[0], cv2.COLOR_BGR2GRAY)
 				overlay = cv2.addWeighted(c.astype(np.float32)/255.0, 0.5, grey_in/255.0, 0.5, 0)
-				cv2.imshow("overlay", overlay)
-				cv2.waitKey(0)
+				#cv2.imshow("overlay", overlay)
+				#cv2.waitKey(0)
 
 				w = warp_flow(prev_im_stylised, back_flow)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
