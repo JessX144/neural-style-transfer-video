@@ -40,7 +40,9 @@ tr = './training_dataset_bo/'
 list = os.listdir('./training_dataset_bo') # dir is your directory path
 num_data = len(list)
 
-temporal_weight = 10e-4
+# values are quite large 
+# ~1/10 of style weight  
+temporal_weight = 1e-8
 
 prev_im = np.zeros([b_size, 224, 224, 3], np.float32)
 prev_im_stylised = np.zeros([b_size, 224, 224, 3], np.float32)
@@ -66,7 +68,6 @@ def get_train_imgs(name):
 
 def get_style_img(img):
 	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
-	#img = Image.open('./style_images/' + str(img) + '.jpg')
 	img = preprocess_img(img)
 	return img
 
@@ -142,6 +143,8 @@ def temporal_loss(x, w, c):
 	c = c[np.newaxis,:,:]
 	w = w[np.newaxis,:,:]
 	D = 224 * 224 
+	# difference between stylised frame and warped stylised frame 
+	# mulitply by c - losses in occluded areas not taken 
 	loss = (1. / D) * tf.reduce_sum(c * tf.nn.l2_loss(x - w))
 	loss = tf.cast(loss, tf.float32)
 	return loss
@@ -226,7 +229,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 	style_np = [style for x in range(b_size)]
 
 	# gets all content images you need - video frames
-	imgs = get_train_imgs('bo')
+	imgs = get_train_imgs('frame')
 	print('img length: {}'.format(len(imgs)))
 
 	iter = int(num_data / b_size) 
@@ -261,7 +264,16 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 			dict = {input: inp_imgs, style_img: style_np, temp_c:c, temp_w:w}
 
-			loss, out, t_loss, _ = sess.run([total_loss, output, temp_loss, train], feed_dict=dict)
+			loss, out, t_loss, s_loss, _ = sess.run([total_loss, output, temp_loss, style_loss, train], feed_dict=dict)
+
+			#print("temp loss: ", t_loss)
+			#print("style loss: ", s_loss)
+
+			#loss_w = cv2.cvtColor(out[0], cv2.COLOR_BGR2GRAY) - w
+			#cv2.imshow('loss_w', loss_w/255.0)
+			#cv2.waitKey(0)
+			#cv2.imshow('loss_w', c*loss_w/255.0)
+			#cv2.waitKey(0) #831744.56 #1314716.4
 
 			prev_im = inp_imgs.copy()
 			prev_im_stylised = unprocess_out(out.copy())
