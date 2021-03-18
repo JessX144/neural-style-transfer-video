@@ -23,7 +23,6 @@ def inst_norm(x):
 	return tf.nn.batch_normalization(x, i_mean, i_var, 0, 1, 1e-10)
 
 def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
-		#net = tf.nn.conv2d(net, self_v, strides=[1, num_str, num_str, 1], padding='SAME')
 		f_size = int(filter_size/2)
 		# should help with border effect 
 		net = tf.pad(net, [[0,0], [f_size, f_size], [f_size, f_size], [0,0]], mode='REFLECT')
@@ -93,6 +92,7 @@ class transformer():
 
 	def __call__(self, image):
 
+		# removes border effect
 		image = tf.pad(image, [[0,0], [10,10], [10,10],[0,0]], mode='REFLECT')
 
 		# convolution layers 
@@ -114,7 +114,7 @@ class transformer():
 
 		output = tf.multiply((tf.tanh(image) + 1), tf.constant(127.5, tf.float32, shape=image.get_shape()), name='output') 
 		
-		# 244 244 
+		# remove padding 
 		height = tf.shape(output)[1]
 		width = tf.shape(output)[2]
 		output = tf.slice(output, [0, 10, 10, 0], tf.stack([-1, height - 20, width - 20, -1]))
