@@ -23,7 +23,6 @@ def get_img(img, img_dir):
 	img = Image.open(img_dir + str(img) + '.jpg').convert('RGB')
 	return img
 
-
 def write_img(img_name, style_name, img):
 	img.save('./output_images/{}_{}.jpg'.format(img_name, style_name))
 	return img
@@ -45,18 +44,62 @@ def unprocess_img(img, style_name, input_name, input_shape):
 
 	write_img(input_name, style_name, im)
 
+def play_video(name):
+	cap = cv2.VideoCapture(name) 
+	
+	# Check if camera opened successfully 
+	if (cap.isOpened()== False):  
+		print("Error opening video file") 
+	
+	# Read until video is completed 
+	while(cap.isOpened()): 
+		
+		# Capture frame-by-frame 
+		ret, frame = cap.read() 
+		if ret == True: 
+	
+			# Display the resulting frame 
+			cv2.imshow('Frame', frame) 
+	
+			# Press Q on keyboard to  exit 
+			if cv2.waitKey(25) & 0xFF == ord('q'): 
+				break
+	
+		# Break the loop 
+		else:  
+			break
+	
+	# When everything done, release  
+	# the video capture object 
+	cap.release() 
+	
+	# Closes all the frames 
+	cv2.destroyAllWindows() 
+
 def create_vid(img, video, input_shape):
+
 	img = img[0]
-	# print(img)
+	# remove padding
+	img = img[10:-10,10:-10,:]
+
 	img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 	im = Image.fromarray(np.uint8(img))
 	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
 	# filters for when resizing, change num pixels rather than resize 
-	im = im.resize((input_shape[1], input_shape[0]), resample=Image.LANCZOS)
-	# print("written image has size {}, {}".format(input_shape[1], input_shape[0]))
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
 	im = np.array(im)
 
 	video.write(im)
+
+def write_frames(name):
+	vidcap = cv2.VideoCapture('./input_images/' + name + '.avi')
+	success,image = vidcap.read()
+	os.mkdir('./input_images/' + name)
+	count = 0
+	while success:
+		cv2.imwrite('./input_images/' + name + '/frame%d.jpg' % count, image)     # save frame as JPEG file      
+		success,image = vidcap.read()
+		count += 1
 
 def stylise(img, style):
 	with tf.device('/gpu:0'):
@@ -67,12 +110,14 @@ def stylise(img, style):
 			saver.restore(sess, input_checkpoint)
 			graph = tf.get_default_graph()
 
-			#print(sess.run(graph.get_tensor_by_name(':0')))
-						
 			input_image_ten = graph.get_tensor_by_name('input:0')
 			output_ten = graph.get_tensor_by_name('output:0')
 
 			dir_name = './input_images/' + img
+
+			if not os.path.exists(dir_name):
+				write_frames(img)
+
 			dir_list = os.listdir(dir_name)
 
 			first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
@@ -93,6 +138,8 @@ def stylise(img, style):
 
 			video.release()
 			cv2.destroyAllWindows()
+		
+			# play_video("./output_images/" + img + "_" + style + ".avi")
 
 def main():
 	stylise(cont, sty)

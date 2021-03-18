@@ -23,7 +23,8 @@ style_layers = ['conv1_1',
 
 style_weight = args.style_w
 
-content_layers = ['conv4_2']
+#content_layers = ['conv4_2']
+content_layers = ['conv5_2']
 
 content_weight = 1e0
 
