@@ -123,7 +123,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				im = imgs[i * b_size + j]
 				inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
 			dict = {input: inp_imgs, style_img: style_np}
-			loss, _ = sess.run([total_loss, train], feed_dict=dict)
+			loss, out, _ = sess.run([total_loss, output, train], feed_dict=dict)
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
 
 	saver.save(sess, ckpt_directory + sty, global_step=e)
