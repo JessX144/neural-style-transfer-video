@@ -7,15 +7,11 @@ from vgg19 import vgg19
 import cv2
 import numpy as np
 from PIL import Image
-
 import math
 import time
-
-from variables import b_size, epoch
 from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
-parser.add_argument('--style_w', '-w', type=float)
 args = parser.parse_args()
 
 
@@ -24,29 +20,22 @@ style_layers = ['conv1_1',
 								'conv3_1', 
 								'conv4_1', 
 								'conv5_1']
-
-# style_weight = 0.3e1 works for strong styles
-# style_weight = 1e1 works for subtle styles
-style_weight = args.style_w
-
 content_layers = ['conv4_2']
 
+epoch = 2
+b_size = 1 # optical flow, do not take batches of images 
+style_weight = 1e0
 content_weight = 1e0
-
 learn_rate = 1e-3
 var_weight = 10e-4
+temporal_weight = 5e-8 # values are quite large, ~1/5 of style loss  
 
-tr = './training_dataset_bo/'
-list = os.listdir('./training_dataset_bo') # dir is your directory path
+tr = './training_dataset_4/'
+list = os.listdir('./training_dataset_4') # dir is your directory path
 num_data = len(list)
-
-# values are quite large 
-# ~1/10 of style weight  
-temporal_weight = 5e-8
 
 prev_im = np.zeros([b_size, 224, 224, 3], np.float32)
 prev_im_stylised = np.zeros([b_size, 224, 224, 3], np.float32)
-
 hsv = np.zeros((224,224,3))
 hsv[...,1] = 255
 
@@ -229,7 +218,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 	style_np = [style for x in range(b_size)]
 
 	# gets all content images you need - video frames
-	imgs = get_train_imgs('bo')
+	imgs = get_train_imgs('frame')
 	print('img length: {}'.format(len(imgs)))
 
 	iter = int(num_data / b_size) 
@@ -256,7 +245,6 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				#cv2.waitKey(0)
 
 				w = warp_flow(prev_im_stylised, back_flow)
-				print(w.shape)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
 
 			else:

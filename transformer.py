@@ -3,7 +3,7 @@
 
 import tensorflow as tf, pdb
 
-from variables import norm
+norm = "i"
 
 def batch_norm(x):
 		mean, var = tf.nn.moments(x, axes=[1, 2, 3])
@@ -11,7 +11,6 @@ def batch_norm(x):
 		b_var = tf.reduce_mean(var)
 		b_mean = tf.reduce_mean(mean)
 
-		#var = tf.reshape(var, [1,1])
 		return tf.nn.batch_normalization(x, b_mean, b_var, 0, 1, 1e-5)
 
 def inst_norm(x):
@@ -112,7 +111,10 @@ class transformer():
 		image = conv_tranpose(self.conv_t2, image, 32, 2)
 		image = conv_tranpose(self.conv_t3, image, 3, 1, relu=False, normalise=False)
 
+		# ensures output is in range of 0-255
+		# different methods of doing so 
 		output = tf.multiply((tf.tanh(image) + 1), tf.constant(127.5, tf.float32, shape=image.get_shape()), name='output') 
+		# output = tf.nn.tanh(image) * 150 + 255./2
 		
 		# remove padding 
 		height = tf.shape(output)[1]

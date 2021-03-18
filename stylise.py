@@ -4,20 +4,22 @@ import cv2
 from PIL import Image
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from argparse import ArgumentParser
-
 import vgg19 
-
-from variables import b_size, epoch, sty, cont
 
 input_dir = './input_images/'
 style_dir = './style_images/'
 
 parser = ArgumentParser()
-parser.add_argument('--mode', '-m', type=str)
+parser.add_argument('--style', '-s', type=str)
+parser.add_argument('--content', '-c', type=str)
+parser.add_argument('--batch', '-b', type=int, default=1)
 args = parser.parse_args()
-mode = args.mode
+
+sty = args.style
+cont = args.content
+b_size = args.batch
+epoch = 2
 
 def get_img(img, img_dir):
 	img = Image.open(img_dir + str(img) + '.jpg').convert('RGB')

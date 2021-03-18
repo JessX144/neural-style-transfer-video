@@ -8,30 +8,31 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from variables import b_size, epoch
 from argparse import ArgumentParser
+
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
-parser.add_argument('--style_w', '-w', type=float)
+parser.add_argument('--b_size', '-b', type=int, default=1)
 args = parser.parse_args()
+
+b_size = args.b_size
+sty = args.style
 
 style_layers = ['conv1_1',
 								'conv2_1',
 								'conv3_1', 
 								'conv4_1', 
 								'conv5_1']
-
-style_weight = args.style_w
-
 content_layers = ['conv4_2']
 
+epoch = 2
+style_weight = 1e0
 content_weight = 1e0
-
 learn_rate = 1e-3
 var_weight = 10e-4
 
 tr = './training_dataset_4/'
-list = os.listdir('./training_dataset_4') # dir is your directory path
+list = os.listdir('./training_dataset_4')
 num_data = len(list)
 
 def preprocess_img(img):
@@ -98,8 +99,6 @@ with tf.device('/gpu:0'):
 	train = tf.train.AdamOptimizer(learn_rate).minimize(total_loss)
 
 with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-
-	sty = args.style
 
 	ckpt_directory = './checkpts/{}/'.format(sty)
 	if not os.path.exists(ckpt_directory):

@@ -1,4 +1,7 @@
 #!/bin/bash
 (set -o igncr) 2>/dev/null && set -o igncr;
 
-python train_transf.py -s ship -w 1e0
+python train.py -s picasso 
+python train_noise.py -s picasso 
+python train_flow.py -s picasso 
+python stylise.py -s picasso -c bo

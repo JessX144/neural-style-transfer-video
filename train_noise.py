@@ -8,12 +8,11 @@ import cv2
 import numpy as np
 from PIL import Image
 import random
-
-from variables import b_size, epoch
 from argparse import ArgumentParser
+
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
-parser.add_argument('--style_w', '-w', type=float)
+parser.add_argument('--b_size', '-b', type=int, default=1)
 args = parser.parse_args()
 
 style_layers = ['conv1_1',
@@ -21,23 +20,19 @@ style_layers = ['conv1_1',
 								'conv3_1', 
 								'conv4_1', 
 								'conv5_1']
-
-# style_weight = 0.3e1 works for strong styles
-# style_weight = 1e1 works for subtle styles
-style_weight = args.style_w
-
 content_layers = ['conv4_2']
 
+epoch = 2
+b_size = args.b_size
+style_weight = 1e0
 content_weight = 1e0
-
 learn_rate = 1e-3
 var_weight = 10e-4
+temporal_weight = 10e-4
 
 tr = './training_dataset_4/'
 list = os.listdir('./training_dataset_4') # dir is your directory path
 num_data = len(list)
-
-temporal_weight = 10e-4
 
 def preprocess_img(img):
 	imgpre = img.copy()
@@ -55,7 +50,6 @@ def get_train_imgs(name):
 
 def get_style_img(img):
 	img = Image.open('./style_images/' + str(img) + '.jpg').convert('RGB')
-	#img = Image.open('./style_images/' + str(img) + '.jpg')
 	img = preprocess_img(img)
 	return img
 
