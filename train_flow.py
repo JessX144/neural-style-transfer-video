@@ -30,8 +30,8 @@ learn_rate = 1e-3
 var_weight = 10e-4
 temporal_weight = 5e-8 # values are quite large, ~1/5 of style loss  
 
-tr = './training_dataset_4/'
-list = os.listdir('./training_dataset_4') # dir is your directory path
+tr = './input_images/bo/'
+list = os.listdir('./input_images/bo') # dir is your directory path
 num_data = len(list)
 
 prev_im = np.zeros([b_size, 224, 224, 3], np.float32)
@@ -81,7 +81,8 @@ def get_flow_weights_bounds(flow1, flow2):
 
 		xSize = flow1.shape[1]
 		ySize = flow1.shape[0]
-		reliable = 255 * np.ones((ySize, xSize))
+		# reliable = 255 * np.ones((ySize, xSize))
+		reliable = np.ones((ySize, xSize))
 
 		# prewitt kernel - works with greyscale images, like the optical flow algorithm 
 		x_kernel = [[-0.5, -0.5, -0.5],[0., 0., 0.],[0.5, 0.5, 0.5]]
@@ -113,12 +114,14 @@ def get_flow_weights_bounds(flow1, flow2):
 				motionEdge[i,j] = dy[i,j,0]*dy[i,j,0] + dy[i,j,1]*dy[i,j,1] + dx[i,j,0]*dx[i,j,0] + dx[i,j,1]*dx[i,j,1]
 				motionEdge_2[i,j] = dy_2[i,j,0]*dy_2[i,j,0] + dy_2[i,j,1]*dy_2[i,j,1] + dx_2[i,j,0]*dx_2[i,j,0] + dx[i,j,1]*dx[i,j,1]
 
-				if motionEdge[i, j] - motionEdge_2[i,j] > 0.01: 
+				if motionEdge[i, j] - motionEdge_2[i,j] > 1.0: 
 					reliable[i, j] = 0.0
 
 		# apply smoothing 
-		reliable = cv2.GaussianBlur(reliable,(3,3),0)
-		reliable = np.clip(reliable, 0.0, 255.0)
+		#reliable = cv2.GaussianBlur(reliable,(3,3),0)
+		#reliable = np.clip(reliable, 0.0, 255.0)
+
+		reliable = np.clip(reliable, 0.0, 1.0)
 
 		return reliable	
 
@@ -236,14 +239,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				back_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(inp_imgs[0], cv2.COLOR_BGR2GRAY), cv2.cvtColor(prev_im[0], cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
 				# certainty, comparing forward and backward flow 
-				c = get_flow_weights_bounds(back_flow, for_flow)
-
-				# confidence measure on image
-				grey_in = cv2.cvtColor(inp_imgs[0], cv2.COLOR_BGR2GRAY)
-				overlay = cv2.addWeighted(c.astype(np.float32)/255.0, 0.5, grey_in/255.0, 0.5, 0)
-				#cv2.imshow("overlay", overlay)
-				#cv2.waitKey(0)
-
+				c = 1.0 - get_flow_weights_bounds(back_flow, for_flow)
 				w = warp_flow(prev_im_stylised, back_flow)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
 
@@ -254,15 +250,6 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			dict = {input: inp_imgs, style_img: style_np, temp_c:c, temp_w:w}
 
 			loss, out, t_loss, s_loss, _ = sess.run([total_loss, output, temp_loss, style_loss, train], feed_dict=dict)
-
-			#print("temp loss: ", t_loss)
-			#print("style loss: ", s_loss)
-
-			#loss_w = cv2.cvtColor(out[0], cv2.COLOR_BGR2GRAY) - w
-			#cv2.imshow('loss_w', loss_w/255.0)
-			#cv2.waitKey(0)
-			#cv2.imshow('loss_w', c*loss_w/255.0)
-			#cv2.waitKey(0) #831744.56 #1314716.4
 
 			prev_im = inp_imgs.copy()
 			prev_im_stylised = unprocess_out(out.copy())

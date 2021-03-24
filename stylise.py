@@ -128,6 +128,7 @@ def stylise(img, style):
 			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
 			
 			for frame in dir_list:
+				print("frame: ", frame)
 				n = frame.split(".")[0]
 				input_img = Image.open(dir_name + '/' + frame).convert('RGB')
 

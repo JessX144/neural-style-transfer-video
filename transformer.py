@@ -112,9 +112,7 @@ class transformer():
 		image = conv_tranpose(self.conv_t3, image, 3, 1, relu=False, normalise=False)
 
 		# ensures output is in range of 0-255
-		# different methods of doing so 
 		output = tf.multiply((tf.tanh(image) + 1), tf.constant(127.5, tf.float32, shape=image.get_shape()), name='output') 
-		# output = tf.Variable(tf.nn.tanh(image) * 150 + 255./2, name='output')
 		
 		# remove padding 
 		height = tf.shape(output)[1]
