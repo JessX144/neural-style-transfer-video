@@ -3,8 +3,6 @@
 
 import tensorflow as tf, pdb
 
-norm = "i"
-
 def batch_norm(x):
 		mean, var = tf.nn.moments(x, axes=[1, 2, 3])
 
@@ -36,7 +34,7 @@ def conv(self_v, net, num_filters, filter_size, num_str, relu=True):
 			net = inst_norm(net)
 		return net
 
-def conv_tranpose(self_v, net, num_filters, num_str, relu=True, normalise=True):		
+def conv_tranpose(self_v, net, num_filters, num_str, relu=True, normalise=True):	
 		batch, rows, cols, ch = [i for i in net.get_shape()]
 		new_rows = rows * num_str
 		new_cols = cols * num_str
@@ -73,7 +71,10 @@ def init_vars(net, out_ch, filter_size, name, transpose=False):
 
 class transformer():
 	# Need to initialise variables to save the graph 
-	def __init__(self, image):
+	def __init__(self, image, n):
+
+		global norm
+		norm = n
 
 		self.conv1 = init_vars(image, 32, 9, "t_conv1_w")
 		self.conv2 = init_vars(self.conv1, 64, 4, "t_conv2_w")
@@ -89,7 +90,7 @@ class transformer():
 		self.conv_t2 = init_vars(self.conv_t1, 32, 4, "t_dconv2_w", transpose=True)
 		self.conv_t3 = init_vars(self.conv_t2, 3, 9, "t_dconv3_w", transpose=True)
 
-	def __call__(self, image):
+	def __call__(self, image, n):
 
 		# removes border effect
 		image = tf.pad(image, [[0,0], [10,10], [10,10],[0,0]], mode='REFLECT')

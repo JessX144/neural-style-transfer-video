@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
 parser.add_argument('--b_size', '-b', type=int, default=1)
+parser.add_argument('--norm', '-n', type=str, default="b")
 args = parser.parse_args()
 
 style_layers = ['conv1_1',
@@ -24,6 +25,7 @@ content_layers = ['conv4_2']
 
 epoch = 2
 b_size = args.b_size
+norm = args.norm 
 style_weight = 1e0
 content_weight = 1e0
 learn_rate = 1e-3
@@ -82,13 +84,13 @@ with tf.device('/gpu:0'):
 	input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
 	noisy_inp_im = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='noisy_inp_im')
 	# initialise net
-	trans_net = transformer(input)
+	trans_net = transformer(input, norm)
 	saver = tf.train.Saver(restore_sequentially=True)
 
 	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name="style_img")
 
-	output = trans_net(input)
-	noisy_output = trans_net(noisy_inp_im)
+	output = trans_net(input, norm)
+	noisy_output = trans_net(noisy_inp_im, norm)
 
 	vgg_style = vgg19(style_img)
 	vgg_content = vgg19(input)

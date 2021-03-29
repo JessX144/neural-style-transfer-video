@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import numpy as np
 import tensorflow as tf
 import cv2
@@ -6,19 +7,27 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from argparse import ArgumentParser
 import vgg19 
+import youtube_dl
+
+ydl_opts = {}
 
 input_dir = './input_images/'
 style_dir = './style_images/'
 
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
-parser.add_argument('--content', '-c', type=str)
+parser.add_argument('--content', '-c', type=str, default="e")
 parser.add_argument('--batch', '-b', type=int, default=1)
+parser.add_argument('--url', '-u', type=str, default="e")
+parser.add_argument('--name', '-n', type=str, default="video")
 args = parser.parse_args()
 
 sty = args.style
 cont = args.content
 b_size = args.batch
+url = args.url
+name = args.name
+
 epoch = 2
 
 def get_img(img, img_dir):
@@ -94,12 +103,17 @@ def create_vid(img, video, input_shape):
 	video.write(im)
 
 def write_frames(name):
-	vidcap = cv2.VideoCapture('./input_images/' + name + '.avi')
+	prefixed = [filename for filename in os.listdir('./input_images/') if name in filename]
+	print(prefixed)
+	filename, file_extension = os.path.splitext(prefixed[0])
+	# print('./input_images/' + name + file_extension)
+	vidcap = cv2.VideoCapture('./input_images/' + name + file_extension)
+
 	success,image = vidcap.read()
 	os.mkdir('./input_images/' + name)
 	count = 0
 	while success:
-		cv2.imwrite('./input_images/' + name + '/frame%d.jpg' % count, image)     # save frame as JPEG file      
+		cv2.imwrite('./input_images/' + name + '/' + "{:06d}".format(count) + '.jpg', image)     # save frame as JPEG file      
 		success,image = vidcap.read()
 		count += 1
 
@@ -115,20 +129,27 @@ def stylise(img, style):
 			input_image_ten = graph.get_tensor_by_name('input:0')
 			output_ten = graph.get_tensor_by_name('output:0')
 
-			dir_name = './input_images/' + img
+			# if a url has been provided 
+			if not (url == "e"):
+				with youtube_dl.YoutubeDL({'outtmpl': './input_images/' + name + '.%(ext)s'}) as ydl:
+					info_dict = ydl.extract_info(url, download=False)
+					first_img_w = info_dict.get("width", None)
+					first_img_h = info_dict.get("height", None)
+					ydl.download([url])
+					write_frames(name)
+					img = name
+			elif not (img == "e"):
+				if not os.path.exists('./input_images/' + img):
+					write_frames(img)
 
-			if not os.path.exists(dir_name):
-				write_frames(img)
+			dir_name = './input_images/' + img
 
 			dir_list = os.listdir(dir_name)
 
-			first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
-
 			fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
+			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 30.0, (first_img_w, first_img_h))
 			
 			for frame in dir_list:
-				print("frame: ", frame)
 				n = frame.split(".")[0]
 				input_img = Image.open(dir_name + '/' + frame).convert('RGB')
 
@@ -145,6 +166,7 @@ def stylise(img, style):
 			# play_video("./output_images/" + img + "_" + style + ".avi")
 
 def main():
+
 	stylise(cont, sty)
 
 if __name__ == "__main__":

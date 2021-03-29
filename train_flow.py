@@ -12,6 +12,7 @@ import time
 from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
+parser.add_argument('--norm', '-n', type=str, default="b")
 args = parser.parse_args()
 
 
@@ -22,13 +23,14 @@ style_layers = ['conv1_1',
 								'conv5_1']
 content_layers = ['conv4_2']
 
+norm = args.norm 
 epoch = 2
 b_size = 1 # optical flow, do not take batches of images 
 style_weight = 1e0
 content_weight = 1e0
 learn_rate = 1e-3
 var_weight = 10e-4
-temporal_weight = 5e-8 # values are quite large, ~1/5 of style loss  
+temporal_weight = 1e-4 # values are quite large, ~1/5 of style loss  
 
 tr = './input_images/bo/'
 list = os.listdir('./input_images/bo') # dir is your directory path
@@ -136,7 +138,7 @@ def temporal_loss(x, w, c):
 	w = w[np.newaxis,:,:]
 	D = 224 * 224 
 	# difference between stylised frame and warped stylised frame 
-	# mulitply by c - losses in occluded areas not taken 
+	# mulitply by c - losses in occluded areas added
 	loss = (1. / D) * tf.reduce_sum(c * tf.nn.l2_loss(x - w))
 	loss = tf.cast(loss, tf.float32)
 	return loss
@@ -166,12 +168,12 @@ with tf.device('/gpu:0'):
 
 	input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
 	# initialise net
-	trans_net = transformer(input)
+	trans_net = transformer(input, norm)
 	saver = tf.train.Saver(restore_sequentially=True)
 
 	style_img = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name="style_img")
 
-	output = trans_net(input)
+	output = trans_net(input, norm)
 
 	vgg_style = vgg19(style_img)
 	vgg_content = vgg19(input)
@@ -250,6 +252,9 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			dict = {input: inp_imgs, style_img: style_np, temp_c:c, temp_w:w}
 
 			loss, out, t_loss, s_loss, _ = sess.run([total_loss, output, temp_loss, style_loss, train], feed_dict=dict)
+
+			print("t_loss", t_loss)
+			print("s_loss", s_loss)
 
 			prev_im = inp_imgs.copy()
 			prev_im_stylised = unprocess_out(out.copy())
