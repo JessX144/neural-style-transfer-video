@@ -1,7 +1,7 @@
 # TRAINS TRANSFORMER NET - takes into account optical flow 
-import tensorflow as tf
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
 from transformer import transformer
 from vgg19 import vgg19
 import cv2
@@ -9,6 +9,10 @@ import numpy as np
 from PIL import Image
 import math
 import time
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
+print("Opening Tensorflow with CUDA and CUDNN")
+
 from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
@@ -51,6 +55,10 @@ def preprocess_img(img):
 	
 	return imgpre
 
+def conv_col(im):
+	b, g, r = im.split()
+	im = Image.merge("RGB", (r, g, b))
+	return im
 
 def unprocess_img(img, input_shape):
 	img = img[0]
@@ -224,11 +232,12 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	# gets all content images you need - video frames
 	imgs = get_train_imgs('frame')
-	print('img length: {}'.format(len(imgs)))
+	print('Number of training images: {}'.format(len(imgs)))
 
 	iter = int(num_data / b_size) 
 
 	t0 = time.time()
+	print("Begin Training Network with style", sty)
 
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
@@ -264,13 +273,14 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				input_shape = np.array(Image.open(im).convert('RGB')).shape
 				out_im = unprocess_img(out, input_shape)
 				cv2.imwrite(progress + sty + "_" + str(e) + "_" + str(i) + ".jpg", out_im)
-				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", inp_imgs[0])
-			if (i*j + i % 1 == 0):
+				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", np.array(conv_col(Image.open(im))))
+			if (i*j + i % 1000 == 0):
 				f = open("./test_output/trainflow_loss.txt", "a")
 				f.write(str(loss[0]) + ' ') 
 				f.close()
 
 	t1 = time.time()
+	print("Saving Model")
 	saver.save(sess, ckpt_directory + sty, global_step=e)
 	total_time = t1-t0
 	f = open("./test_output/trainflow_loss.txt", "a")

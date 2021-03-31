@@ -258,63 +258,72 @@ def rmse(predictions, targets):
 opt_flow_loss = []
 certainty_flow_loss = []
 
-# gets all content images you need - video frames
-imgs = get_train_imgs('frame')
-print('img length: {}'.format(len(imgs)))
+def get_loss():
 
-inp_imgs = np.zeros((224, 224, 3), dtype=np.float32)
-# we evaluate pairs of frames
-for i in range(num_data):
-	im = imgs[i]
-	im_next = imgs[i + 1]
-	inp_imgs = np.array(Image.open(im_next).resize((224, 224)).convert('RGB'))
-	prev_im = np.array(Image.open(im).resize((224, 224)).convert('RGB'))
+	# gets all content images you need - video frames
+	imgs = get_train_imgs('frame')
+	print('img length: {}'.format(len(imgs)))
 
-	for_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(prev_im, cv2.COLOR_BGR2GRAY), cv2.cvtColor(inp_imgs, cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
-	flow_im = _flow2color(for_flow)
+	inp_imgs = np.zeros((224, 224, 3), dtype=np.float32)
+	# we evaluate pairs of frames
+	for i in range(num_data):
+		im = imgs[i]
+		im_next = imgs[i + 1]
+		inp_imgs = np.array(Image.open(im_next).resize((224, 224)).convert('RGB'))
+		prev_im = np.array(Image.open(im).resize((224, 224)).convert('RGB'))
 
-	ground_flow_for = open('./testing_flows/alley_1_flow/frame_' + str(i+1).zfill(4) + '.flo', 'rb')
-	ground_flow_for = read_flow(ground_flow_for)
-	ground_flow_for = cv2.resize(ground_flow_for, dsize=(224, 224))
-	g_flow_im_for = _flow2color(ground_flow_for)
+		for_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(prev_im, cv2.COLOR_BGR2GRAY), cv2.cvtColor(inp_imgs, cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
+		flow_im = _flow2color(for_flow)
 
-	cv2.imshow('ground forward flow', g_flow_im_for)
-	cv2.waitKey(0)
-	cv2.imshow('forward flow', flow_im)
-	cv2.waitKey(0)
+		ground_flow_for = open('./testing_flows/alley_1_flow/frame_' + str(i+1).zfill(4) + '.flo', 'rb')
+		ground_flow_for = read_flow(ground_flow_for)
+		ground_flow_for = cv2.resize(ground_flow_for, dsize=(224, 224))
+		g_flow_im_for = _flow2color(ground_flow_for)
 
-	opt_loss_for = rmse(for_flow, ground_flow_for)
-	print("rmse, range:", opt_loss_for, max(np.ptp(for_flow), np.ptp(ground_flow_for)))
-	print("rmse percentage:", opt_loss_for/max(np.ptp(for_flow), np.ptp(ground_flow_for)))
+		cv2.imshow('ground forward flow', g_flow_im_for)
+		cv2.waitKey(0)
+		cv2.imshow('forward flow', flow_im)
+		cv2.waitKey(0)
 
-	occ_im = cv2.imread('./testing_flows/alley_1_occ/frame_' + str(i+1).zfill(4) + '.png')
-	occ_im = cv2.cvtColor(occ_im, cv2.COLOR_BGR2GRAY)
-	occ_im = Image.fromarray(occ_im).resize((224, 224))
-	occ_im = np.array(occ_im).astype(np.float32)
-	occ_im = np.clip(occ_im, 0.0, 1.0)
+		opt_loss_for = rmse(for_flow, ground_flow_for)
+		print("rmse, range:", opt_loss_for, max(np.ptp(for_flow), np.ptp(ground_flow_for)))
+		print("rmse percentage:", opt_loss_for/max(np.ptp(for_flow), np.ptp(ground_flow_for)))
 
-	# certainty matrix of forward flow
-	c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
+		occ_im = cv2.imread('./testing_flows/alley_1_occ/frame_' + str(i+1).zfill(4) + '.png')
+		occ_im = cv2.cvtColor(occ_im, cv2.COLOR_BGR2GRAY)
+		occ_im = Image.fromarray(occ_im).resize((224, 224))
+		occ_im = np.array(occ_im).astype(np.float32)
+		occ_im = np.clip(occ_im, 0.0, 1.0)
 
-	cv2.imshow("c", c)
-	cv2.waitKey(0)
-	cv2.imshow("occ_im", occ_im)
-	cv2.waitKey(0)
+		# certainty matrix of forward flow
+		c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
 
-	f_loss = f1_score(occ_im.ravel(), c.ravel(), average='macro')
+		cv2.imshow("c", c)
+		cv2.waitKey(0)
+		cv2.imshow("occ_im", occ_im)
+		cv2.waitKey(0)
 
-	certainty_flow_loss.append(f_loss)
+		f_loss = f1_score(occ_im.ravel(), c.ravel(), average='macro')
 
-	#tn, fp, fn, tp = confusion_matrix(occ_im.ravel(), c.ravel()).ravel()
-	#acc = (tp+tn)/(224*224)
-	#sensitivity = tp/(tp+fn)
-	#specificity = tn/(tn+fp)
-	#certainty_sens_loss.append(sensitivity)
-	#certainty_spec_loss.append(specificity)
+		certainty_flow_loss.append(f_loss)
+
+		#tn, fp, fn, tp = confusion_matrix(occ_im.ravel(), c.ravel()).ravel()
+		#acc = (tp+tn)/(224*224)
+		#sensitivity = tp/(tp+fn)
+		#specificity = tn/(tn+fp)
+		#certainty_sens_loss.append(sensitivity)
+		#certainty_spec_loss.append(specificity)
 		
-	print('iter {}/{}'.format(i, num_data))
+		print('iter {}/{}'.format(i, num_data))
 
-avg_opt_flow_loss = np.average(opt_flow_loss)
-avg_certainty_loss = np.average(certainty_flow_loss)
-print("average optical flow loss against ground value: ", avg_opt_flow_loss)
-print("average certainity f-measure against ground value: ", avg_certainty_loss)
+	avg_opt_flow_loss = np.average(opt_flow_loss)
+	avg_certainty_loss = np.average(certainty_flow_loss)
+	print("average optical flow loss against ground value: ", avg_opt_flow_loss)
+	print("average certainity f-measure against ground value: ", avg_certainty_loss)
+
+
+def main():
+	get_loss()
+
+if __name__ == "__main__":
+		main()

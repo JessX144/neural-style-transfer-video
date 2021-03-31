@@ -1,15 +1,17 @@
 ﻿# TRAINS TRANSFORMER NET 
-import tensorflow as tf
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
+import tensorflow as tf
 from transformer import transformer
 from vgg19 import vgg19
 import cv2
 import numpy as np
 from PIL import Image
 import time
-
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from argparse import ArgumentParser
+
+print("Opening Tensorflow with CUDA and CUDNN")
 
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
@@ -80,6 +82,11 @@ def gram_matrix(x):
     gram = tf.matmul(features, features, adjoint_a=True)/tf.constant(ch*w*h, tf.float32)
     return gram
 
+def conv_col(im):
+	b, g, r = im.split()
+	im = Image.merge("RGB", (r, g, b))
+	return im
+
 with tf.device('/gpu:0'):
 
 	input = tf.placeholder(tf.float32, shape=[b_size, 224, 224, 3], name='input')
@@ -130,11 +137,12 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	# gets all content images you need - video frames
 	imgs = get_train_imgs('frame')
-	print('img length: {}'.format(len(imgs)))
+	print('Number of training images: {}'.format(len(imgs)))
 
 	iter = int(num_data / b_size)
 
 	t0 = time.time()
+	print("Begin Training Network with style", sty)
 
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
@@ -146,17 +154,18 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			loss, out, _ = sess.run([total_loss, output, train], feed_dict=dict)
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
 
-			if (i*j + i % 1 == 0):
+			if (i*j + i % 1000 == 0):
 				input_shape = np.array(Image.open(im).convert('RGB')).shape
 				out_im = unprocess_img(out, input_shape)
 				cv2.imwrite(progress + sty + "_" + str(e) + "_" + str(i) + ".jpg", out_im)
-				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", inp_imgs[0])
-			if (i*j + i % 1 == 0):
+				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", np.array(conv_col(Image.open(im))))
+			if (i*j + i % 1000 == 0):
 				f = open("./test_output/train_loss.txt", "a")
 				f.write(str(loss[0]) + ' ') 
 				f.close()
 
 	t1 = time.time()
+	print("Saving Model")
 	saver.save(sess, ckpt_directory + sty, global_step=e)
 	total_time = t1-t0
 	f = open("./test_output/train_loss.txt", "a")
