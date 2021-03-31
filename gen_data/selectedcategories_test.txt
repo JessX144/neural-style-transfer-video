@@ -1,10 +1,5 @@
-Games
-Video game
-Vehicle
 Cartoon
 Car
-Guitar
-String instrument
 Food
 Football
 Musical ensemble
@@ -25,14 +20,12 @@ Motorcycle
 Dish
 Drums
 Acoustic guitar
-Action-adventure game
 Call of Duty
 Electric guitar
 Drummer
 Cosmetics
 Keyboard
 Choir
-Strategy video game
 Fishing
 Aircraft
 Train
@@ -69,13 +62,11 @@ American football
 Drawing
 Pokémon
 Tractor
-Grand Theft Auto V
 Naruto
 Cymbal
 Engine
 House
 World of Warcraft
-Call of Duty: Black Ops II
 Four-wheel drive
 Bird
 Violin
