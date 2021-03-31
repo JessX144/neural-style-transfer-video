@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 import random
 from argparse import ArgumentParser
+import time
 
 parser = ArgumentParser()
 parser.add_argument('--style', '-s', type=str)
@@ -32,15 +33,30 @@ learn_rate = 1e-3
 var_weight = 10e-4
 temporal_weight = 10e-4
 
-tr = './training_dataset_4/'
-list = os.listdir('./training_dataset_4') # dir is your directory path
+tr = './input_images/bo/'
+list = os.listdir('./input_images/bo') # dir is your directory path
 num_data = len(list)
+
+progress = './test_output/progress_noise/'
 
 def preprocess_img(img):
 	imgpre = img.copy()
 	imgpre = imgpre.resize((224, 224))
 	imgpre = np.asarray(imgpre, dtype=np.float32)
 	return imgpre
+
+def unprocess_img(img, input_shape):
+	img = img[0]
+	# remove padding
+	img = img[10:-10,10:-10,:]
+
+	img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+	im = Image.fromarray(np.uint8(img))
+	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
+	# filters for when resizing, change num pixels rather than resize 
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
+	im = np.array(im)
+	return im
 
 def get_train_imgs(name):
 	imgs = []
@@ -142,6 +158,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	noise_im = gen_noise()
 
+	t0 = time.time()
+
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
 		noisy_inp_img = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
@@ -150,10 +168,23 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				im = imgs[i * b_size + j]
 				inp_imgs[j] = preprocess_img(Image.open(im).convert('RGB'))
 			noisy_inp_img = inp_imgs + noise_im
-
 			dict = {input: inp_imgs, style_img: style_np, noisy_inp_im:noisy_inp_img}
-
 			loss, out, _ = sess.run([total_loss, output, train], feed_dict=dict)
-
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
+
+			if (i*j + i % 1 == 0):
+				input_shape = np.array(Image.open(im).convert('RGB')).shape
+				out_im = unprocess_img(out, input_shape)
+				cv2.imwrite(progress + sty + "_" + str(e) + "_" + str(i) + ".jpg", out_im)
+				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", inp_imgs[0])
+			if (i*j + i % 1 == 0):
+				f = open("./test_output/trainnoise_loss.txt", "a")
+				f.write(str(loss[0]) + ' ') 
+				f.close()
+
+	t1 = time.time()
 	saver.save(sess, ckpt_directory + sty, global_step=e)
+	total_time = t1-t0
+	f = open("./test_output/trainnoise_loss.txt", "a")
+	f.write('\ntime: ' + str(total_time) + 'seconds')  
+	f.close()

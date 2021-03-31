@@ -7,6 +7,7 @@ from vgg19 import vgg19
 import cv2
 import numpy as np
 from PIL import Image
+import time
 
 from argparse import ArgumentParser
 
@@ -37,6 +38,8 @@ tr = './training_dataset_4/'
 list = os.listdir('./training_dataset_4')
 num_data = len(list)
 
+progress = './test_output/progress/'
+
 def preprocess_img(img):
 
 	imgpre = img.copy()
@@ -44,6 +47,19 @@ def preprocess_img(img):
 	imgpre = np.asarray(imgpre, dtype=np.float32)
 	
 	return imgpre
+
+def unprocess_img(img, input_shape):
+	img = img[0]
+	# remove padding
+	img = img[10:-10,10:-10,:]
+
+	img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+	im = Image.fromarray(np.uint8(img))
+	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
+	# filters for when resizing, change num pixels rather than resize 
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
+	im = np.array(im)
+	return im
 
 def get_train_imgs(name):
 	imgs = []
@@ -118,6 +134,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	iter = int(num_data / b_size)
 
+	t0 = time.time()
+
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
 		for i in range(iter):
@@ -128,4 +146,19 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			loss, out, _ = sess.run([total_loss, output, train], feed_dict=dict)
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
 
+			if (i*j + i % 1 == 0):
+				input_shape = np.array(Image.open(im).convert('RGB')).shape
+				out_im = unprocess_img(out, input_shape)
+				cv2.imwrite(progress + sty + "_" + str(e) + "_" + str(i) + ".jpg", out_im)
+				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", inp_imgs[0])
+			if (i*j + i % 1 == 0):
+				f = open("./test_output/train_loss.txt", "a")
+				f.write(str(loss[0]) + ' ') 
+				f.close()
+
+	t1 = time.time()
 	saver.save(sess, ckpt_directory + sty, global_step=e)
+	total_time = t1-t0
+	f = open("./test_output/train_loss.txt", "a")
+	f.write('\ntime: ' + str(total_time) + ' seconds')  
+	f.close()

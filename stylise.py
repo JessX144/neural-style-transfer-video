@@ -8,6 +8,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from argparse import ArgumentParser
 import vgg19 
 import youtube_dl
+import time
 
 ydl_opts = {}
 
@@ -138,17 +139,20 @@ def stylise(img, style):
 					ydl.download([url])
 					write_frames(name)
 					img = name
+					dir_name = './input_images/' + img
+					dir_list = os.listdir(dir_name)
 			elif not (img == "e"):
+				dir_name = './input_images/' + img
+				dir_list = os.listdir(dir_name)
+				first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
 				if not os.path.exists('./input_images/' + img):
 					write_frames(img)
 
-			dir_name = './input_images/' + img
-
-			dir_list = os.listdir(dir_name)
-
 			fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 30.0, (first_img_w, first_img_h))
+			video = cv2.VideoWriter("./output_images/" + img + "_" + style + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
 			
+			t0 = time.time()
+
 			for frame in dir_list:
 				n = frame.split(".")[0]
 				input_img = Image.open(dir_name + '/' + frame).convert('RGB')
@@ -159,11 +163,13 @@ def stylise(img, style):
 				out = sess.run(output_ten, feed_dict={input_image_ten: input_img})
 
 				create_vid(out, video, input_shape)
-
+			t1 = time.time()
 			video.release()
 			cv2.destroyAllWindows()
 		
 			# play_video("./output_images/" + img + "_" + style + ".avi")
+			total_time = t1-t0
+			print("time to stylise: ", total_time, "seconds")
 
 def main():
 

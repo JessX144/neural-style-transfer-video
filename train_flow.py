@@ -36,6 +36,8 @@ tr = './input_images/bo/'
 list = os.listdir('./input_images/bo') # dir is your directory path
 num_data = len(list)
 
+progress = './test_output/progress_flow/'
+
 prev_im = np.zeros([b_size, 224, 224, 3], np.float32)
 prev_im_stylised = np.zeros([b_size, 224, 224, 3], np.float32)
 hsv = np.zeros((224,224,3))
@@ -48,6 +50,20 @@ def preprocess_img(img):
 	imgpre = np.asarray(imgpre, dtype=np.float32)
 	
 	return imgpre
+
+
+def unprocess_img(img, input_shape):
+	img = img[0]
+	# remove padding
+	img = img[10:-10,10:-10,:]
+
+	img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+	im = Image.fromarray(np.uint8(img))
+	# resample NEAREST, BILINEAR, BICUBIC, ANTIALIAS 
+	# filters for when resizing, change num pixels rather than resize 
+	im = im.resize((input_shape[1], input_shape[0]), resample=Image.BILINEAR)
+	im = np.array(im)
+	return im
 
 def get_train_imgs(name):
 	imgs = []
@@ -78,13 +94,11 @@ def warp_flow(img, flow):
 		res = cv2.remap(img, flow, None, cv2.INTER_LINEAR)
 		return res
 
-# flow weights by comparing motion boundaries 
-def get_flow_weights_bounds(flow1, flow2): 
+def get_flow_weights_bounds(flow, thresh): 
 
-		xSize = flow1.shape[1]
-		ySize = flow1.shape[0]
-		# reliable = 255 * np.ones((ySize, xSize))
-		reliable = np.ones((ySize, xSize))
+		x_dim = flow.shape[1]
+		y_dim = flow.shape[0]
+		cert_mat = np.ones((y_dim, x_dim))
 
 		# prewitt kernel - works with greyscale images, like the optical flow algorithm 
 		x_kernel = [[-0.5, -0.5, -0.5],[0., 0., 0.],[0.5, 0.5, 0.5]]
@@ -92,40 +106,26 @@ def get_flow_weights_bounds(flow1, flow2):
 		y_kernel = [[-0.5, 0., 0.5],[-0.5, 0., 0.5],[-0.5, 0., 0.5]]
 		y_kernel = np.array(y_kernel, np.float32)
 	
-		flow_x_dx = cv2.filter2D(flow1[:,:,0],-1,x_kernel)
-		flow_x_dy = cv2.filter2D(flow1[:,:,0],-1,y_kernel)
+		flow_x_dx = cv2.filter2D(flow[:,:,0],-1,x_kernel)
+		flow_x_dy = cv2.filter2D(flow[:,:,0],-1,y_kernel)
 		dx = np.stack((flow_x_dx, flow_x_dy), axis = -1)
 
-		flow_y_dx = cv2.filter2D(flow1[:,:,1],-1,x_kernel)
-		flow_y_dy = cv2.filter2D(flow1[:,:,1],-1,y_kernel)
+		flow_y_dx = cv2.filter2D(flow[:,:,1],-1,x_kernel)
+		flow_y_dy = cv2.filter2D(flow[:,:,1],-1,y_kernel)
 		dy = np.stack((flow_y_dx, flow_y_dy), axis = -1)
 
-		flow_x_dx_2 = cv2.filter2D(flow2[:,:,0],-1,x_kernel)
-		flow_x_dy_2 = cv2.filter2D(flow2[:,:,0],-1,y_kernel)
-		dx_2 = np.stack((flow_x_dx_2, flow_x_dy_2), axis = -1)
+		motion_edg = np.zeros((y_dim,x_dim))
 
-		flow_y_dx_2 = cv2.filter2D(flow2[:,:,1],-1,x_kernel)
-		flow_y_dy_2 = cv2.filter2D(flow2[:,:,1],-1,y_kernel)
-		dy_2 = np.stack((flow_y_dx_2, flow_y_dy_2), axis = -1)
+		for i in range(y_dim):
+			for j in range(x_dim): 
+				motion_edg[i,j] = dy[i,j,0]*dy[i,j,0] + dy[i,j,1]*dy[i,j,1] + dx[i,j,0]*dx[i,j,0] + dx[i,j,1]*dx[i,j,1]
 
-		motionEdge = np.zeros((ySize,xSize))
-		motionEdge_2 = np.zeros((ySize,xSize))
+				if motion_edg[i,j] > thresh: 
+					cert_mat[i, j] = 0.0
 
-		for i in range(ySize):
-			for j in range(xSize): 
-				motionEdge[i,j] = dy[i,j,0]*dy[i,j,0] + dy[i,j,1]*dy[i,j,1] + dx[i,j,0]*dx[i,j,0] + dx[i,j,1]*dx[i,j,1]
-				motionEdge_2[i,j] = dy_2[i,j,0]*dy_2[i,j,0] + dy_2[i,j,1]*dy_2[i,j,1] + dx_2[i,j,0]*dx_2[i,j,0] + dx[i,j,1]*dx[i,j,1]
+		cert_mat = np.clip(cert_mat, 0.0, 1.0)
 
-				if motionEdge[i, j] - motionEdge_2[i,j] > 1.0: 
-					reliable[i, j] = 0.0
-
-		# apply smoothing 
-		#reliable = cv2.GaussianBlur(reliable,(3,3),0)
-		#reliable = np.clip(reliable, 0.0, 255.0)
-
-		reliable = np.clip(reliable, 0.0, 1.0)
-
-		return reliable	
+		return cert_mat	
 
 # https://openaccess.thecvf.com/content_cvpr_2017/papers/Huang_Real-Time_Neural_Style_CVPR_2017_paper.pdf
 # temporal loss - difference between stylised output at t and warped stylised output at t - 1
@@ -228,6 +228,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 	iter = int(num_data / b_size) 
 
+	t0 = time.time()
+
 	for e in range(epoch):
 		inp_imgs = np.zeros((b_size, 224, 224, 3), dtype=np.float32)
 		for i in range(iter):
@@ -241,7 +243,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				back_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(inp_imgs[0], cv2.COLOR_BGR2GRAY), cv2.cvtColor(prev_im[0], cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
 				# certainty, comparing forward and backward flow 
-				c = 1.0 - get_flow_weights_bounds(back_flow, for_flow)
+				c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
 				w = warp_flow(prev_im_stylised, back_flow)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
 
@@ -253,11 +255,24 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 			loss, out, t_loss, s_loss, _ = sess.run([total_loss, output, temp_loss, style_loss, train], feed_dict=dict)
 
-			print("t_loss", t_loss)
-			print("s_loss", s_loss)
-
 			prev_im = inp_imgs.copy()
 			prev_im_stylised = unprocess_out(out.copy())
 
 			print('iter {}/{} loss: {}'.format(i + 1, iter, loss[0]))
+
+			if (i*j + i % 1000 == 0):
+				input_shape = np.array(Image.open(im).convert('RGB')).shape
+				out_im = unprocess_img(out, input_shape)
+				cv2.imwrite(progress + sty + "_" + str(e) + "_" + str(i) + ".jpg", out_im)
+				cv2.imwrite(progress + sty + "_content_" + str(e) + "_" + str(i) + ".jpg", inp_imgs[0])
+			if (i*j + i % 1 == 0):
+				f = open("./test_output/trainflow_loss.txt", "a")
+				f.write(str(loss[0]) + ' ') 
+				f.close()
+
+	t1 = time.time()
 	saver.save(sess, ckpt_directory + sty, global_step=e)
+	total_time = t1-t0
+	f = open("./test_output/trainflow_loss.txt", "a")
+	f.write('\ntime: ' + str(total_time) + 'seconds')  
+	f.close()

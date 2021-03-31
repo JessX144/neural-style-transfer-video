@@ -50,9 +50,9 @@ def warp_flow(img, flow):
 # flow weights by comparing motion boundaries 
 def get_flow_weights_bounds(flow, thresh): 
 
-		xSize = flow.shape[1]
-		ySize = flow.shape[0]
-		reliable = np.ones((ySize, xSize))
+		x_dim = flow.shape[1]
+		y_dim = flow.shape[0]
+		cert_mat = np.ones((y_dim, x_dim))
 
 		# prewitt kernel - works with greyscale images, like the optical flow algorithm 
 		x_kernel = [[-0.5, -0.5, -0.5],[0., 0., 0.],[0.5, 0.5, 0.5]]
@@ -68,18 +68,18 @@ def get_flow_weights_bounds(flow, thresh):
 		flow_y_dy = cv2.filter2D(flow[:,:,1],-1,y_kernel)
 		dy = np.stack((flow_y_dx, flow_y_dy), axis = -1)
 
-		motionEdge = np.zeros((ySize,xSize))
+		motion_edg = np.zeros((y_dim,x_dim))
 
-		for i in range(ySize):
-			for j in range(xSize): 
-				motionEdge[i,j] = dy[i,j,0]*dy[i,j,0] + dy[i,j,1]*dy[i,j,1] + dx[i,j,0]*dx[i,j,0] + dx[i,j,1]*dx[i,j,1]
+		for i in range(y_dim):
+			for j in range(x_dim): 
+				motion_edg[i,j] = dy[i,j,0]*dy[i,j,0] + dy[i,j,1]*dy[i,j,1] + dx[i,j,0]*dx[i,j,0] + dx[i,j,1]*dx[i,j,1]
 
-				if motionEdge[i,j] > thresh: 
-					reliable[i, j] = 0.0
+				if motion_edg[i,j] > thresh: 
+					cert_mat[i, j] = 0.0
 
-		reliable = np.clip(reliable, 0.0, 1.0)
+		cert_mat = np.clip(cert_mat, 0.0, 1.0)
 
-		return reliable	
+		return cert_mat	
 
 # https://openaccess.thecvf.com/content_cvpr_2017/papers/Huang_Real-Time_Neural_Style_CVPR_2017_paper.pdf
 # temporal loss - difference between stylised output at t and warped stylised output at t - 1
@@ -293,7 +293,7 @@ for i in range(num_data):
 	occ_im = np.array(occ_im).astype(np.float32)
 	occ_im = np.clip(occ_im, 0.0, 1.0)
 
-	# certainty, comparing forward and backward flow 
+	# certainty matrix of forward flow
 	c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
 
 	cv2.imshow("c", c)
