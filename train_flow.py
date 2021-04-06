@@ -252,7 +252,9 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 				back_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(inp_imgs[0], cv2.COLOR_BGR2GRAY), cv2.cvtColor(prev_im[0], cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
 				# certainty, comparing forward and backward flow 
-				c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
+				c = get_flow_weights_bounds(for_flow, 0.1)
+				cv2.imshow('c',c)
+				cv2.waitKey(0)
 				w = warp_flow(prev_im_stylised, back_flow)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
 
