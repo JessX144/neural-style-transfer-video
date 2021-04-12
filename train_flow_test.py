@@ -6,16 +6,22 @@ from transformer import transformer
 from vgg19 import vgg19
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageTk
 import math
 import time
 from argparse import ArgumentParser
 import math 
 
-from sklearn.metrics import f1_score, confusion_matrix, matthews_corrcoef, mean_squared_error
+from tkinter import Tk, Canvas, NW, mainloop, Label
 
-tr = './testing_flows/alley_1_im/'
-list = os.listdir('./testing_flows/alley_1_im') # dir is your directory path
+from sklearn.metrics import f1_score
+
+dir = "alley_1"
+
+tr = './testing_flows/' + dir + '_im/'
+list = os.listdir('./testing_flows/'+ dir + '_im') # dir is your directory path
+flow_f = './testing_flows/' + dir +'_flow/frame_'
+occ_f = './testing_flows/'+ dir + '_occ/frame_'
 num_data = len(list)
 
 hsv = np.zeros((224,224,3))
@@ -46,6 +52,84 @@ def warp_flow(img, flow):
 		flow[:,:,1] += np.arange(h)[:,np.newaxis]
 		res = cv2.remap(img, flow, None, cv2.INTER_LINEAR)
 		return res
+
+# Confidence matrix calculations for Ruder implementation 
+# https://github.com/coyotestarrkwsq/style-transfer-for-video/blob/3dc32066af1292fbbc9e3977ba9a54652a6b14a2/flow.py
+def get_flow_weights_bound_ruder(flow1, flow2): 
+  xSize = flow1.shape[1]
+  ySize = flow1.shape[0]
+  reliable = 255 * np.ones((ySize, xSize))
+
+  size = xSize * ySize
+
+  x_kernel = [[-0.5, -0.5, -0.5],[0., 0., 0.],[0.5, 0.5, 0.5]]
+  x_kernel = np.array(x_kernel, np.float32)
+  y_kernel = [[-0.5, 0., 0.5],[-0.5, 0., 0.5],[-0.5, 0., 0.5]]
+  y_kernel = np.array(y_kernel, np.float32)
+  
+  flow_x_dx = cv2.filter2D(flow1[:,:,0],-1,x_kernel)
+  flow_x_dy = cv2.filter2D(flow1[:,:,0],-1,y_kernel)
+  dx = np.stack((flow_x_dx, flow_x_dy), axis = -1)
+
+  flow_y_dx = cv2.filter2D(flow1[:,:,0],-1,x_kernel)
+  flow_y_dy = cv2.filter2D(flow1[:,:,0],-1,y_kernel)
+  dy = np.stack((flow_y_dx, flow_y_dy), axis = -1)
+
+  motionEdge = np.zeros((ySize,xSize))
+
+  for i in range(ySize):
+    for j in range(xSize): 
+      motionEdge[i,j] += dy[i,j,0]*dy[i,j,0]
+      motionEdge[i,j] += dy[i,j,1]*dy[i,j,1]
+      motionEdge[i,j] += dx[i,j,0]*dx[i,j,0]
+      motionEdge[i,j] += dx[i,j,1]*dx[i,j,1]
+      
+  for ax in range(xSize):
+    for ay in range(ySize): 
+      bx = ax + flow1[ay, ax, 0]
+      by = ay + flow1[ay, ax, 1]    
+
+      x1 = int(bx)
+      y1 = int(by)
+      x2 = x1 + 1
+      y2 = y1 + 1
+      
+      if x1 < 0 or x2 >= xSize or y1 < 0 or y2 >= ySize:
+        reliable[ay, ax] = 0.0
+        continue 
+      
+      alphaX = bx - x1 
+      alphaY = by - y1
+
+      a = (1.0-alphaX) * flow2[y1, x1, 0] + alphaX * flow2[y1, x2, 0]
+      b = (1.0-alphaX) * flow2[y2, x1, 0] + alphaX * flow2[y2, x2, 0]
+      
+      u = (1.0 - alphaY) * a + alphaY * b
+      
+      a = (1.0-alphaX) * flow2[y1, x1, 1] + alphaX * flow2[y1, x2, 1]
+      b = (1.0-alphaX) * flow2[y2, x1, 1] + alphaX * flow2[y2, x2, 1]
+      
+      v = (1.0 - alphaY) * a + alphaY * b
+      cx = bx + u
+      cy = by + v
+      u2 = flow1[ay,ax,0]
+      v2 = flow1[ay,ax,1]
+      
+      if ((cx-ax) * (cx-ax) + (cy-ay) * (cy-ay)) >= 0.01 * (u2*u2 + v2*v2 + u*u + v*v) + 0.5: 
+        # Set to a negative value so that when smoothing is applied the smoothing goes "to the outside".
+        # Afterwards, we clip values below 0.
+        reliable[ay, ax] = -255.0
+        continue
+      
+      if motionEdge[ay, ax] > 0.01 * (u2*u2 + v2*v2) + 0.002: 
+        reliable[ay, ax] = 0.0
+        continue
+      
+  #need to apply smoothing to reliable mat
+  reliable = cv2.GaussianBlur(reliable,(3,3),0)
+  ret, reliable = cv2.threshold(reliable,10,1.0,cv2.THRESH_BINARY)
+  reliable = np.clip(reliable, 0.0, 1.0)   
+  return reliable  
 
 # flow weights by comparing motion boundaries 
 def get_flow_weights_bounds(flow, thresh): 
@@ -81,7 +165,6 @@ def get_flow_weights_bounds(flow, thresh):
 
 		return cert_mat	
 
-# https://openaccess.thecvf.com/content_cvpr_2017/papers/Huang_Real-Time_Neural_Style_CVPR_2017_paper.pdf
 # temporal loss - difference between stylised output at t and warped stylised output at t - 1
 # x: stylised image at time t 
 # w: warped stylised image at time t-1
@@ -92,11 +175,11 @@ def temporal_loss(x, w, c):
 	w = w[np.newaxis,:,:]
 	D = 224 * 224 
 	# difference between stylised frame and warped stylised frame 
-	# mulitply by c - losses in occluded areas not taken 
 	loss = (1. / D) * tf.reduce_sum(c * tf.nn.l2_loss(x - w))
 	loss = tf.cast(loss, tf.float32)
 	return loss
 
+################################# OPENCV IMPLEMENTATION TO VISUALISE OPTICAL FLOW
 def conv_flow_rgb(flow):
 	print(flow.shape)
 	mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
@@ -107,8 +190,6 @@ def conv_flow_rgb(flow):
 	return rgb
 
 def _color_wheel():
-    # Original inspiration: http://members.shaw.ca/quadibloc/other/colint.htm
-
     RY = 15
     YG = 6
     GC = 4
@@ -158,7 +239,6 @@ def _color_wheel():
 
 def _normalize_flow(flow):
     UNKNOWN_FLOW_THRESH = 1e9
-    # UNKNOWN_FLOW = 1e10
 
     height, width, nBands = flow.shape
     if not nBands == 2:
@@ -246,6 +326,7 @@ def _flow2color(flow):
     img = _compute_color(u, v)
 
     return img
+################################# 
 
 def rmse(predictions, targets):
 		x = (targets - predictions) 
@@ -267,54 +348,69 @@ def get_loss():
 	inp_imgs = np.zeros((224, 224, 3), dtype=np.float32)
 	# we evaluate pairs of frames
 	for i in range(num_data):
+		root = Tk()  
 		im = imgs[i]
 		im_next = imgs[i + 1]
 		inp_imgs = np.array(Image.open(im_next).resize((224, 224)).convert('RGB'))
 		prev_im = np.array(Image.open(im).resize((224, 224)).convert('RGB'))
 
 		for_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(prev_im, cv2.COLOR_BGR2GRAY), cv2.cvtColor(inp_imgs, cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
+		back_flow = cv2.calcOpticalFlowFarneback(cv2.cvtColor(inp_imgs, cv2.COLOR_BGR2GRAY), cv2.cvtColor(prev_im, cv2.COLOR_BGR2GRAY), None, 0.5, 3, 15, 3, 5, 1.2, 0)
 		flow_im = _flow2color(for_flow)
 
-		ground_flow_for = open('./testing_flows/alley_1_flow/frame_' + str(i+1).zfill(4) + '.flo', 'rb')
+		ground_flow_for = open(flow_f + str(i+1).zfill(4) + '.flo', 'rb')
 		ground_flow_for = read_flow(ground_flow_for)
 		ground_flow_for = cv2.resize(ground_flow_for, dsize=(224, 224))
 		g_flow_im_for = _flow2color(ground_flow_for)
 
-		cv2.imshow('ground forward flow', g_flow_im_for)
-		cv2.waitKey(0)
-		cv2.imshow('forward flow', flow_im)
-		cv2.waitKey(0)
+		tk_g_flow_im_for = ImageTk.PhotoImage(image=Image.fromarray(g_flow_im_for))    
+		label = Label(root, image = tk_g_flow_im_for)
+		label.image = tk_g_flow_im_for
+		label.grid(row=0, column=0, columnspan=3)
+
+		tk_flow_im = ImageTk.PhotoImage(image=Image.fromarray(flow_im))    
+		label2 = Label(root, image = tk_flow_im)
+		label2.image = tk_flow_im
+		label2.grid(row=0, column=1, columnspan=3)
 
 		opt_loss_for = rmse(for_flow, ground_flow_for)
-		print("rmse, range:", opt_loss_for, max(np.ptp(for_flow), np.ptp(ground_flow_for)))
 		print("rmse percentage:", opt_loss_for/max(np.ptp(for_flow), np.ptp(ground_flow_for)))
 
-		occ_im = cv2.imread('./testing_flows/alley_1_occ/frame_' + str(i+1).zfill(4) + '.png')
+		occ_im = cv2.imread(occ_f + str(i+1).zfill(4) + '.png')
 		occ_im = cv2.cvtColor(occ_im, cv2.COLOR_BGR2GRAY)
 		occ_im = Image.fromarray(occ_im).resize((224, 224))
 		occ_im = np.array(occ_im).astype(np.float32)
 		occ_im = np.clip(occ_im, 0.0, 1.0)
 
 		# certainty matrix of forward flow
-		c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
+		c = 1.0 - get_flow_weights_bounds(for_flow, 0.15)
+		c_rud = 1.0 - get_flow_weights_bound_ruder(back_flow, for_flow)
 
-		cv2.imshow("c", c)
-		cv2.waitKey(0)
-		cv2.imshow("occ_im", occ_im)
-		cv2.waitKey(0)
+		tk_c = ImageTk.PhotoImage(image=Image.fromarray(c*255))    
+		label3 = Label(root, image = tk_c)
+		label3.image = tk_c
+		label3.grid(row=1, column=0)
+
+		tk_c_rud = ImageTk.PhotoImage(image=Image.fromarray(c_rud*255))    
+		label4 = Label(root, image = tk_c_rud)
+		label4.image = tk_c_rud
+		label4.grid(row=1, column=1)
+
+		tk_occ_im = ImageTk.PhotoImage(image=Image.fromarray(occ_im*255))    
+		label5 = Label(root, image = tk_occ_im)
+		label5.image = tk_c_rud
+		label5.grid(row=1, column=3)
+ 
+		mainloop() 
 
 		f_loss = f1_score(occ_im.ravel(), c.ravel(), average='macro')
+		print(f_loss)
+
+		f_loss_r = f1_score(occ_im.ravel(), c_rud.ravel(), average='macro')
+		print(f_loss_r)
 
 		certainty_flow_loss.append(f_loss)
-
-		#tn, fp, fn, tp = confusion_matrix(occ_im.ravel(), c.ravel()).ravel()
-		#acc = (tp+tn)/(224*224)
-		#sensitivity = tp/(tp+fn)
-		#specificity = tn/(tn+fp)
-		#certainty_sens_loss.append(sensitivity)
-		#certainty_spec_loss.append(specificity)
-		
-		print('iter {}/{}'.format(i, num_data))
+		print('test image {}/{}'.format(i, num_data))
 
 	avg_opt_flow_loss = np.average(opt_flow_loss)
 	avg_certainty_loss = np.average(certainty_flow_loss)

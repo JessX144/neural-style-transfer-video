@@ -38,8 +38,6 @@ class vgg19():
 		bgr = tf.concat([b_channel - VGG_MEAN[0], g_channel - VGG_MEAN[1],
 										r_channel - VGG_MEAN[2],], axis=3)
 
-		#bgr = bgr / 255.0
-
 		# no FC layers
 		self.conv1_1 = self.conv_layer(input_img, "conv1_1")
 		self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")

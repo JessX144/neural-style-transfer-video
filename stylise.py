@@ -129,9 +129,6 @@ def generate_opt_vid(prev_img, curr_img, fl_vid, conf_vid):
 	fl_im = _flow2color(for_flow)
 	c = 1.0 - get_flow_weights_bounds(for_flow, 0.1)
 
-	#t1 = time.time()
-	#print("time: ", t1-t0)
-
 	conf_vid.write(c.astype(np.uint8) * 255)
 	fl_vid.write(fl_im)
 
@@ -139,7 +136,6 @@ def write_frames(name):
 	prefixed = [filename for filename in os.listdir('./input_images/') if name in filename]
 	print(prefixed)
 	filename, file_extension = os.path.splitext(prefixed[0])
-	# print('./input_images/' + name + file_extension)
 	vidcap = cv2.VideoCapture('./input_images/' + name + file_extension)
 
 	success,image = vidcap.read()
@@ -165,20 +161,12 @@ def stylise(img, style):
 			# if a url has been provided 
 			if not (url == "e"):
 				with youtube_dl.YoutubeDL({'outtmpl': './input_images/' + name + '.%(ext)s'}) as ydl:
-					#info_dict = ydl.extract_info(url, download=False)
-					#first_img_w = info_dict.get("width", None)
-					#first_img_h = info_dict.get("height", None)
 					ydl.download([url])
 					write_frames(name)
 					img = name
-					#dir_name = './input_images/' + img
-					#dir_list = os.listdir(dir_name)
 			elif not (img == "e"):
-				# dir_name = './input_images/' + img
 				if not os.path.exists('./input_images/' + img):
 					write_frames(img)
-				#dir_list = os.listdir(dir_name)
-				#first_img_w, first_img_h = Image.open(dir_name + '/' + dir_list[0]).size
 
 			dir_name = './input_images/' + img
 			dir_list = os.listdir(dir_name)

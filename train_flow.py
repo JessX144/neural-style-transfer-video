@@ -253,8 +253,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 
 				# certainty, comparing forward and backward flow 
 				c = get_flow_weights_bounds(for_flow, 0.1)
-				cv2.imshow('c',c)
-				cv2.waitKey(0)
+				#cv2.imshow('c',c)
+				#cv2.waitKey(0)
 				w = warp_flow(prev_im_stylised, back_flow)
 				w = cv2.cvtColor(w, cv2.COLOR_BGR2GRAY)
 

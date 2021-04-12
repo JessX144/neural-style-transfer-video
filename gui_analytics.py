@@ -4,6 +4,7 @@ import PIL.Image, PIL.ImageTk
 import time
 import threading
 from tkinter import ttk
+import sys
 
 window_title = "Stylise Video"
 
@@ -73,33 +74,33 @@ class MyVideoCapture:
 	# Release the video source when the object is destroyed
 	def __del__(self):
 		# stop thread
-		if self.running:
+		while(self.running):
 			self.running = False
 			self.thread.join()
 
 		# relase stream
 		if self.vid.isOpened():
 			self.vid.release()
-			
  
 class tkCamera(tkinter.Frame):
 
-	def __init__(self, window, text="", video_source=0, width=None, height=None):
+	def __init__(self, tab1, row, col, window, text="", video_source=0, width=None, height=None):
 		super().__init__(window)
 		
 		self.window = window
 
-		self.window.maxsize(900, 600)
+		self.window.maxsize(1010, 700)
 		
 		self.window.title(window_title)
 		self.video_source = video_source
 		self.vid = MyVideoCapture(self.video_source, width, height)
 
-		self.label = tkinter.Label(self, text=text)
-		self.label.pack()
+		self.label = tkinter.Label(tab1, text=text)
+		self.label.grid(row=row*2, column=col)
 		
-		self.canvas = tkinter.Canvas(self, width=self.vid.width, height=self.vid.height)
-		self.canvas.pack()
+		self.canvas = tkinter.Canvas(tab1, width=self.vid.width, height=self.vid.height)
+		self.canvas.grid(row=row*2 + 1, column=col)
+		self.canvas.grid(row=row*2 + 1, column=col)
 		 
 		# After it is called once, the update method will be automatically called every delay milliseconds
 		# calculate delay using `FPS`
@@ -108,7 +109,8 @@ class tkCamera(tkinter.Frame):
 		self.image = None
 		
 		self.running = True
-		self.update_frame()
+		if (self.running):
+			self.update_frame()
 			
 	def update_frame(self):
 		# widgets in tkinter already have method `update()` so I have to use different name -
@@ -127,23 +129,36 @@ class tkCamera(tkinter.Frame):
 
 class App:
 
-	def __init__(self, window, window_title, video_sources):
+	def __init__(self, window_title):
 
-		self.window = window
+		self.window = tkinter.Tk()
 
 		self.window.title(window_title)
 		
+		self.tabControl = ttk.Notebook(self.window)	
+		
+		self.tab1 = ttk.Frame(self.tabControl, width=1010, height=700)
+		self.tab2 = ttk.Frame(self.tabControl, width=1010, height=700)
+		self.tab3 = ttk.Frame(self.tabControl, width=1010, height=700)
+		self.tabControl.add(self.tab1, text="FACE")
+		self.tabControl.add(self.tab2, text="BW")
+		self.tabControl.add(self.tab3, text="FLOWER")
+
 		self.vids = []
 
-		columns = 3
-		for number, source in enumerate(video_sources):
-			text, stream = source
-			vid = tkCamera(self.window, text, stream, 300, 300)
-			x = number % columns
-			y = number // columns
-			vid.grid(row=y, column=x)
-			self.vids.append(vid)
-		
+		sty_tabs = [(self.tab1, "face", "guy"), (self.tab2, "bw", "bo"), (self.tab3, "flower", "boy")]
+		for t,s,c in sty_tabs:
+			video_sources = get_sources(s, c)
+			columns = 3
+			for number, source in enumerate(video_sources):
+				text, stream = source
+				row = number % columns
+				col = number // columns
+				vid = tkCamera(t, col, row, self.window, text, stream, 300, 300)
+				self.vids.append(vid)
+
+		self.tabControl.grid(row=0, column=0)
+
 		self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
 		self.window.mainloop()
 	
@@ -153,16 +168,19 @@ class App:
 		print('[App] exit')
 		self.window.destroy()
 
-if __name__ == '__main__':	 
-
+def get_sources(style, cont):
 	sources = [
-		('Train 1', './output_images/bo_face_noise.avi'),
-		('Train 2', './output_images/bo_face_noise_og.avi'),
-		('Train 3', './output_images/bo_face_train.avi'),
-		('Original Video', './output_images/bo_face_train_og.avi'),
-		('Optical Flow', './test_output/bo_flow.avi'),
-		('Confidence Matrix', './test_output/bo_conf.avi')
-		]
+	('Original Video', './input_images/' + cont + '.mp4'),
+	('Train', './output_images/' + cont + "_" + style + '_train.avi'),
+	('Train Noise', './output_images/' + cont + "_" + style + '_noise.avi'),
+	('Train Flow', './output_images/' + cont + "_" + style + '_flow.avi'),
+	('Optical Flow', './test_output/' + cont + '_flow.avi'),
+	('Confidence Matrix', './test_output/' + cont + '_conf.avi')
+	]
+
+	return sources
+
+if __name__ == '__main__':	 
 		
 	# Create a window and pass it to the Application object
-	App(tkinter.Tk(), "Tkinter and OpenCV", sources)
+	App("Tkinter and OpenCV")
