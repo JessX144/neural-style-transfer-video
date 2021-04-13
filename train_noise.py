@@ -34,7 +34,6 @@ style_weight = 1e0
 content_weight = 1e0
 learn_rate = 1e-3
 var_weight = 10e-4
-temporal_weight = 10e-4
 
 tr = './input_images/bo/'
 list = os.listdir('./input_images/bo') # dir is your directory path
