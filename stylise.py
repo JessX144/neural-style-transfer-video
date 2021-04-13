@@ -134,7 +134,6 @@ def generate_opt_vid(prev_img, curr_img, fl_vid, conf_vid):
 
 def write_frames(name):
 	prefixed = [filename for filename in os.listdir('./input_images/') if name in filename]
-	print(prefixed)
 	filename, file_extension = os.path.splitext(prefixed[0])
 	vidcap = cv2.VideoCapture('./input_images/' + name + file_extension)
 
@@ -176,8 +175,8 @@ def stylise(img, style):
 			video = cv2.VideoWriter("./output_images/" + img + "_" + style + "_" + method + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
 
 			scaled_h = int((first_img_h*224)/first_img_w)
-			c_vid = cv2.VideoWriter("./test_output/" + img + "_" +  "conf.avi", fourcc, 17.0, (224, scaled_h), 0)
-			flow_vid = cv2.VideoWriter("./test_output/" + img + "_" + "flow.avi", fourcc, 17.0, (224, scaled_h))
+			c_vid = cv2.VideoWriter("./test_output/" + img + "_" +  "conf.avi", fourcc, 16, (224, scaled_h), 0)
+			flow_vid = cv2.VideoWriter("./test_output/" + img + "_" + "flow.avi", fourcc, 16, (224, scaled_h))
 
 			t0 = time.time()
 			print("Begin Stylising with style", sty)

@@ -84,7 +84,7 @@ class MyVideoCapture:
  
 class tkCamera(tkinter.Frame):
 
-	def __init__(self, tab1, row, col, window, text="", video_source=0, width=None, height=None):
+	def __init__(self, tab, row, col, window, text="", video_source=0, width=None, height=None):
 		super().__init__(window)
 		
 		self.window = window
@@ -95,10 +95,10 @@ class tkCamera(tkinter.Frame):
 		self.video_source = video_source
 		self.vid = MyVideoCapture(self.video_source, width, height)
 
-		self.label = tkinter.Label(tab1, text=text)
+		self.label = tkinter.Label(tab, text=text)
 		self.label.grid(row=row*2, column=col)
 		
-		self.canvas = tkinter.Canvas(tab1, width=self.vid.width, height=self.vid.height)
+		self.canvas = tkinter.Canvas(tab, width=self.vid.width, height=self.vid.height)
 		self.canvas.grid(row=row*2 + 1, column=col)
 		self.canvas.grid(row=row*2 + 1, column=col)
 		 
@@ -142,11 +142,11 @@ class App:
 		self.tab3 = ttk.Frame(self.tabControl, width=1010, height=700)
 		self.tabControl.add(self.tab1, text="FACE")
 		self.tabControl.add(self.tab2, text="BW")
-		self.tabControl.add(self.tab3, text="FLOWER")
+		self.tabControl.add(self.tab3, text="KEEFE")
 
 		self.vids = []
 
-		sty_tabs = [(self.tab1, "face", "guy"), (self.tab2, "bw", "bo"), (self.tab3, "flower", "boy")]
+		sty_tabs = [(self.tab1, "face", "guy"), (self.tab2, "bw", "bo"), (self.tab3, "keefe", "boy")]
 		for t,s,c in sty_tabs:
 			video_sources = get_sources(s, c)
 			columns = 3

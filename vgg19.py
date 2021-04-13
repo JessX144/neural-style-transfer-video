@@ -25,8 +25,6 @@ class vgg19():
 		# latin needed to import weights!
 		# else load of rubbish 
 		self.data_dict = np.load('./vgg19.npy', encoding='latin1', allow_pickle=True).item()
-		#print("data")
-		#print(data_dict['conv1_2'][0])
 
 		VGG_MEAN = [103.939, 116.779, 123.68]
 

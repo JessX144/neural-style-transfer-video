@@ -97,7 +97,7 @@ class MainWindow():
 
 		R1 = Radiobutton(self.styles_bar, text="BW", variable=self.var_style, value='bw', command=self.sel_style).grid(row=0, column=0, padx=5, pady=3, ipadx=10) 
 		R2 = Radiobutton(self.styles_bar, text="face", variable=self.var_style, value='face', command=self.sel_style).grid(row=0, column=1, padx=5, pady=3, ipadx=10) 
-		R3 = Radiobutton(self.styles_bar, text="Picasso", variable=self.var_style, value='picasso', command=self.sel_style).grid(row=0, column=2, padx=5, pady=3, ipadx=10) 
+		R3 = Radiobutton(self.styles_bar, text="keefe", variable=self.var_style, value='keefe', command=self.sel_style).grid(row=0, column=2, padx=5, pady=3, ipadx=10) 
 
 		video_bar = Frame(self.right_frame, width=180, height=185)
 		video_bar.grid(row=2, column=0, padx=5, pady=5)

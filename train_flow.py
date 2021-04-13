@@ -151,6 +151,7 @@ def temporal_loss(x, w, c):
 	loss = tf.cast(loss, tf.float32)
 	return loss
 
+# Opencv implementation to visualise optical flow
 def conv_flow_rgb(flow):
 	mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
 	hsv[...,0] = ang*180/np.pi/2
