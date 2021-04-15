@@ -10,7 +10,7 @@ window_title = "Stylise Video"
 
 class MyVideoCapture:
 
-	def __init__(self, video_source=0, width=None, height=None, fps=None):
+	def __init__(self, p_tab, video_source=0, width=None, height=None, fps=None):
 	
 		self.video_source = video_source
 		self.width = width
@@ -24,34 +24,39 @@ class MyVideoCapture:
 
 		# Get video source width and height
 		if not self.width:
-			self.width = int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))	# convert float to int
+			self.width = int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))	
 		if not self.height:
-			self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))  # convert float to int
+			self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
 		if not self.fps:
-			self.fps = int(self.vid.get(cv2.CAP_PROP_FPS))  # convert float to int
+			self.fps = int(self.vid.get(cv2.CAP_PROP_FPS))
 
 		# default value at start		
 		self.ret = False
 		self.frame = None
 		
 		self.convert_color = cv2.COLOR_BGR2RGB
-		#self.convert_color = cv2.COLOR_BGR2GRAY
 		self.convert_pillow = True
 		
 		# start thread
 		self.running = True
 		self.thread = threading.Thread(target=self.process)
 		self.thread.start()
+
+		self.frame_counter = 0
+		self.p_tab = p_tab
 		
 	def process(self):
-		frame_counter = 0
+		self.frame_counter = 0
 		while self.running:
 			ret, frame = self.vid.read()
-			frame_counter += 1
+			self.frame_counter += 1
 
-			if frame_counter == self.vid.get(cv2.CAP_PROP_FRAME_COUNT):
-				frame_counter = 0 #Or whatever as long as it is the same as next line
-				self.vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
+			if self.frame_counter == self.vid.get(cv2.CAP_PROP_FRAME_COUNT):
+				self.p_tab.fin_loop = True
+
+				for v in self.p_tab.vids:
+					v.vid.frame_counter = 0 #Or whatever as long as it is the same as next line
+					v.vid.vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
 			if ret:
 				# process image
@@ -89,11 +94,13 @@ class tkCamera(tkinter.Frame):
 		
 		self.window = window
 
+		self.tab = tab
+
 		self.window.maxsize(1010, 700)
 		
 		self.window.title(window_title)
 		self.video_source = video_source
-		self.vid = MyVideoCapture(self.video_source, width, height)
+		self.vid = MyVideoCapture(self.tab, self.video_source, width, height)
 
 		self.label = tkinter.Label(tab, text=text)
 		self.label.grid(row=row*2, column=col)
@@ -119,7 +126,6 @@ class tkCamera(tkinter.Frame):
 		ret, frame = self.vid.get_frame()
 		
 		if ret:
-			#self.image = PIL.Image.fromarray(frame)
 			self.image = frame
 			self.photo = PIL.ImageTk.PhotoImage(image=self.image)
 			self.canvas.create_image(0, 0, image=self.photo, anchor='nw')
@@ -146,7 +152,15 @@ class App:
 
 		self.vids = []
 
-		sty_tabs = [(self.tab1, "face", "guy"), (self.tab2, "bw", "bo"), (self.tab3, "keefe", "boy")]
+		self.tab1.vids = []
+		self.tab2.vids = []
+		self.tab3.vids = []
+
+		self.tab1.fin_loop = False
+		self.tab2.fin_loop = False
+		self.tab3.fin_loop = False
+
+		sty_tabs = [(self.tab1, "face", "man"), (self.tab2, "bw", "bo"), (self.tab3, "keefe", "boy")]
 		for t,s,c in sty_tabs:
 			video_sources = get_sources(s, c)
 			columns = 3
@@ -156,6 +170,7 @@ class App:
 				col = number // columns
 				vid = tkCamera(t, col, row, self.window, text, stream, 300, 300)
 				self.vids.append(vid)
+				t.vids.append(vid)
 
 		self.tabControl.grid(row=0, column=0)
 

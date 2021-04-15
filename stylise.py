@@ -175,8 +175,8 @@ def stylise(img, style):
 			video = cv2.VideoWriter("./output_images/" + img + "_" + style + "_" + method + ".avi", fourcc, 17.0, (first_img_w, first_img_h))
 
 			scaled_h = int((first_img_h*224)/first_img_w)
-			c_vid = cv2.VideoWriter("./test_output/" + img + "_" +  "conf.avi", fourcc, 16, (224, scaled_h), 0)
-			flow_vid = cv2.VideoWriter("./test_output/" + img + "_" + "flow.avi", fourcc, 16, (224, scaled_h))
+			c_vid = cv2.VideoWriter("./test_output/" + img + "_" +  "conf.avi", fourcc, 17, (224, scaled_h), 0)
+			flow_vid = cv2.VideoWriter("./test_output/" + img + "_" + "flow.avi", fourcc, 17, (224, scaled_h))
 
 			t0 = time.time()
 			print("Begin Stylising with style", sty)
